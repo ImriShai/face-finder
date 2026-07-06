@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
@@ -21,6 +22,7 @@ class PhotoListResponse(BaseModel):
 
 class DownloadZipRequest(BaseModel):
     photo_ids: list[uuid.UUID]
+    quality: Literal["original", "web"] = "original"
 
     @field_validator("photo_ids")
     @classmethod

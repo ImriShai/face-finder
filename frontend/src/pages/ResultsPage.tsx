@@ -5,6 +5,9 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
 import Container from '@mui/material/Container'
+import ListItemText from '@mui/material/ListItemText'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
 import Snackbar from '@mui/material/Snackbar'
 import Typography from '@mui/material/Typography'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
@@ -13,7 +16,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import DownloadIcon from '@mui/icons-material/Download'
 import SearchOffIcon from '@mui/icons-material/SearchOff'
 import PhotoGallery from '../components/PhotoGallery'
-import { downloadZip, type DownloadProgress } from '../services/api'
+import { downloadZip, type DownloadProgress, type DownloadQuality } from '../services/api'
 import { formatDownloadLabel } from '../utils/format'
 import type { SearchMode, SearchResponse } from '../types'
 
@@ -30,6 +33,7 @@ export default function ResultsPage() {
   const [downloading, setDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<HTMLElement | null>(null)
 
   function toggleSelect(photoId: string) {
     setSelected((prev) => {
@@ -53,13 +57,14 @@ export default function ResultsPage() {
     setSelected(new Set(matches.map((m) => m.photo_id)))
   }
 
-  async function handleDownloadZip() {
+  async function handleDownloadZip(quality: DownloadQuality) {
+    setDownloadMenuAnchor(null)
     if (selected.size === 0) return
     setDownloading(true)
     setDownloadProgress(null)
     setDownloadError(null)
     try {
-      await downloadZip(Array.from(selected), 'my-photos.zip', setDownloadProgress)
+      await downloadZip(Array.from(selected), 'my-photos.zip', setDownloadProgress, quality)
     } catch {
       setDownloadError('Download failed. Please try again.')
     } finally {
@@ -92,10 +97,28 @@ export default function ResultsPage() {
                 variant="contained"
                 startIcon={downloading ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
                 disabled={selected.size === 0 || downloading}
-                onClick={handleDownloadZip}
+                onClick={(e) => setDownloadMenuAnchor(e.currentTarget)}
               >
                 {downloadLabel}
               </Button>
+              <Menu
+                anchorEl={downloadMenuAnchor}
+                open={downloadMenuAnchor !== null}
+                onClose={() => setDownloadMenuAnchor(null)}
+              >
+                <MenuItem onClick={() => handleDownloadZip('web')}>
+                  <ListItemText
+                    primary="Web size (recommended)"
+                    secondary="Great for phones and sharing — downloads fast"
+                  />
+                </MenuItem>
+                <MenuItem onClick={() => handleDownloadZip('original')}>
+                  <ListItemText
+                    primary="Original quality"
+                    secondary="Full-resolution files — may take a while"
+                  />
+                </MenuItem>
+              </Menu>
             </>
           ) : (
             <>

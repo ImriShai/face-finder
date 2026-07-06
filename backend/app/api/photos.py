@@ -18,6 +18,11 @@ from app.services import download_service
 
 router = APIRouter(tags=["photos"], dependencies=[Depends(verify_viewer)])
 
+# Routes authenticated by a single-use download token instead of the viewer
+# cookie (router-level dependencies would still apply if these lived on
+# `router`, so they need their own).
+token_router = APIRouter(tags=["photos"])
+
 
 async def _get_photo_or_404(photo_id: uuid.UUID, db: AsyncSession) -> Photo:
     result = await db.execute(select(Photo).where(Photo.id == photo_id))
@@ -79,7 +84,7 @@ async def create_download_token(
     short-lived opaque token. The client fetches GET /photos/download-zip/{token}
     and uses the estimated size to report download progress.
     """
-    entries = await download_service.resolve_entries(request.photo_ids, db)
+    entries = await download_service.resolve_entries(request.photo_ids, db, request.quality)
     if not entries:
         raise HTTPException(404, "None of the requested photos exist on disk")
 
@@ -91,12 +96,13 @@ async def create_download_token(
     }
 
 
-@router.get("/photos/download-zip/{token}", dependencies=[])
+@token_router.get("/photos/download-zip/{token}")
 async def download_zip_by_token(token: str) -> StreamingResponse:
     """
     Stream the ZIP for a previously issued download token.
-    Auth is satisfied by the token itself (issued only to authenticated users).
-    No viewer-cookie check here so the browser can hit this as a plain navigation.
+    Auth is satisfied by the token itself: single-use, unguessable, 5-minute TTL,
+    issued only to authenticated viewers. No viewer-cookie check here so the
+    browser can hit this as a plain navigation.
     """
     entries = download_service.pop_token(token)
     if entries is None:

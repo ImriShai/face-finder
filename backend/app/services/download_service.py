@@ -1,3 +1,4 @@
+import asyncio
 import os
 import secrets
 import shutil
@@ -6,11 +7,16 @@ import time
 import uuid
 import zipfile
 from pathlib import Path
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.photo import Photo
+from app.storage.storage_service import PREVIEW_EXT, create_preview
+
+DownloadQuality = Literal["original", "web"]
 
 _COPY_BUF = 1 << 20  # 1 MB — vs zipfile's hardcoded 8 KB default
 
@@ -78,14 +84,31 @@ def stream_zip(entries: list[tuple[str, str]]):
         raise RuntimeError("ZIP build failed partway through") from errors[0]
 
 
-async def resolve_entries(photo_ids: list[uuid.UUID], db: AsyncSession) -> list[tuple[str, str]]:
+async def resolve_entries(
+    photo_ids: list[uuid.UUID],
+    db: AsyncSession,
+    quality: DownloadQuality = "original",
+) -> list[tuple[str, str]]:
     result = await db.execute(select(Photo).where(Photo.id.in_(photo_ids)))
     photos_by_id = {p.id: p for p in result.scalars().all()}
-    return [
-        (photos_by_id[pid].original_path, photos_by_id[pid].filename)
-        for pid in photo_ids
-        if pid in photos_by_id and os.path.exists(photos_by_id[pid].original_path)
-    ]
+
+    entries: list[tuple[str, str]] = []
+    loop = asyncio.get_running_loop()
+    for pid in photo_ids:
+        photo = photos_by_id.get(pid)
+        if photo is None or not os.path.exists(photo.original_path):
+            continue
+        if quality == "web":
+            # Web quality reuses the 2000px previews generated at ingestion —
+            # ~50x smaller than originals, which is what makes downloads fast
+            # on phone/Wi-Fi connections.
+            preview_path = os.path.join(settings.PREVIEWS_DIR, f"{photo.id}{PREVIEW_EXT}")
+            if not os.path.exists(preview_path):
+                await loop.run_in_executor(None, create_preview, photo.original_path, preview_path)
+            entries.append((preview_path, f"{Path(photo.filename).stem}{PREVIEW_EXT}"))
+        else:
+            entries.append((photo.original_path, photo.filename))
+    return entries
 
 
 def estimate_zip_size(entries: list[tuple[str, str]]) -> int:

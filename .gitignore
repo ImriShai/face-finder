@@ -14,7 +14,7 @@ dist/
 
 # Storage (runtime data — not source)
 backend/storage/
-storage/
+/storage/
 
 # Environment
 .env
@@ -25,5 +25,7 @@ storage/
 Thumbs.db
 
 # Claude Code local settings (machine-specific, not project source)
-.claude/settings.local.json
-.claude/scheduled_tasks.lock
+.claude/
+.venv/
+CLAUDE.md
+

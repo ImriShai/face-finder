@@ -100,15 +100,24 @@ export interface DownloadProgress {
   total: number
 }
 
+/**
+ * 'web' zips the 2000px previews (~50x smaller than originals) — the right
+ * default for phone/Wi-Fi connections. 'original' zips the full-resolution files.
+ */
+export type DownloadQuality = 'original' | 'web'
+
+const PROGRESS_INTERVAL_MS = 150
+
 export async function downloadZip(
   photoIds: string[],
   zipName = 'photos.zip',
   onProgress?: (progress: DownloadProgress) => void,
+  quality: DownloadQuality = 'web',
 ): Promise<void> {
   // Step 1: resolve photo paths server-side and get a short-lived token plus an estimated size (~instant).
   const { data } = await viewerClient.post<{ token: string; estimated_size: number }>(
     '/photos/download-zip-token',
-    { photo_ids: photoIds },
+    { photo_ids: photoIds, quality },
   )
 
   // Step 2: stream the response ourselves (instead of a plain <a> navigation) so we can
@@ -121,13 +130,21 @@ export async function downloadZip(
   const reader = res.body.getReader()
   const chunks: BlobPart[] = []
   let loaded = 0
+  let lastEmit = 0
   for (;;) {
     const { done, value } = await reader.read()
     if (done) break
     chunks.push(value)
     loaded += value.byteLength
-    onProgress?.({ loaded, total })
+    // Throttle: a state update per network chunk re-renders the page hundreds
+    // of times per second for no visible benefit.
+    const now = Date.now()
+    if (now - lastEmit >= PROGRESS_INTERVAL_MS) {
+      lastEmit = now
+      onProgress?.({ loaded, total })
+    }
   }
+  onProgress?.({ loaded, total })
 
   triggerBlobDownload(new Blob(chunks, { type: 'application/zip' }), zipName)
 }
