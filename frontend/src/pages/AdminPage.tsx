@@ -147,7 +147,6 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 
 function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const navigate = useNavigate()
-  const { photos, total, loading, error, hasMore, sentinelRef, refresh, loadMore } = usePhotoFeed()
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
@@ -159,13 +158,19 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<HTMLElement | null>(null)
 
-  // Favorites (per-browser) and liked-only filtering of the loaded feed.
+  // Favorites (per-browser) and liked-only filtering.
   const { favorites, toggleFavorite } = useFavorites()
   const [likedOnly, setLikedOnly] = useState(false)
-  const shownPhotos = useMemo(
-    () => (likedOnly ? photos.filter((p) => favorites.has(p.id)) : photos),
-    [likedOnly, photos, favorites],
-  )
+  const { photos, total, loading, error, hasMore, sentinelRef, refresh, loadMore } = usePhotoFeed(!likedOnly)
+  const shownPhotos = useMemo<Photo[]>(() => {
+    if (!likedOnly) return photos
+    // The liked view is driven by the favorites set itself, not the paged
+    // feed — it shows every liked photo (thumbnails load by id) without
+    // needing the rest of the gallery, so the feed must not keep paging
+    // in the background just because the filtered grid is short.
+    const loadedById = new Map(photos.map((p) => [p.id, p]))
+    return Array.from(favorites, (id) => loadedById.get(id) ?? { id, filename: '', created_at: '' })
+  }, [likedOnly, photos, favorites])
 
   const currentPhoto: Photo | null = lightboxIndex !== null ? shownPhotos[lightboxIndex] : null
 
@@ -190,10 +195,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
   // Fetch the next page before the lightbox runs out of loaded photos, so browsing
   // forward never requires closing the lightbox to scroll and trigger a load.
+  // (Not in liked mode — that list is already complete.)
   useEffect(() => {
-    if (lightboxIndex === null || !hasMore) return
+    if (lightboxIndex === null || !hasMore || likedOnly) return
     if (shownPhotos.length - 1 - lightboxIndex <= PRELOAD_RADIUS) loadMore()
-  }, [lightboxIndex, shownPhotos.length, hasMore, loadMore])
+  }, [lightboxIndex, shownPhotos.length, hasMore, loadMore, likedOnly])
 
   function toggleSelect(photoId: string) {
     setSelected((prev) => {
@@ -412,20 +418,26 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </Box>
         )}
 
-        {/* Infinite scroll sentinel */}
-        <Box ref={sentinelRef} sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          {loading && <CircularProgress size={28} />}
-          {!loading && photos.length === 0 && !error && (
-            <Typography color="text.secondary">
-              No photos yet. Upload a gallery above.
-            </Typography>
-          )}
-          {!loading && !hasMore && likedOnly && photos.length > 0 && shownPhotos.length === 0 && (
+        {/* Infinite scroll sentinel — disabled in liked mode, where the list is
+            complete and a short grid would otherwise keep the sentinel in view
+            and page in the entire gallery. */}
+        {!likedOnly && (
+          <Box ref={sentinelRef} sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            {loading && <CircularProgress size={28} />}
+            {!loading && photos.length === 0 && !error && (
+              <Typography color="text.secondary">
+                No photos yet. Upload a gallery above.
+              </Typography>
+            )}
+          </Box>
+        )}
+        {likedOnly && shownPhotos.length === 0 && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <Typography color="text.secondary">
               No liked photos yet — tap the heart on a photo to save it here.
             </Typography>
-          )}
-        </Box>
+          </Box>
+        )}
       </Container>
 
       {/* Lightbox */}

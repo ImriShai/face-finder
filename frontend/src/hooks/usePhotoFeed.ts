@@ -4,7 +4,14 @@ import type { Photo } from '../types'
 
 const PAGE_SIZE = 48
 
-export function usePhotoFeed() {
+/**
+ * Paged photo feed with an infinite-scroll sentinel.
+ * Pass autoLoad=false to pause sentinel-driven loading (e.g. while a
+ * client-side filter empties the grid and would leave the sentinel in view);
+ * the observer re-attaches to the (possibly remounted) sentinel when
+ * autoLoad turns true again.
+ */
+export function usePhotoFeed(autoLoad = true) {
   const [resetKey, setResetKey] = useState(0)
   const [photos, setPhotos] = useState<Photo[]>([])
   const [total, setTotal] = useState(0)
@@ -54,7 +61,7 @@ export function usePhotoFeed() {
   // Infinite scroll sentinel
   const hasMore = photos.length < total
   useEffect(() => {
-    if (!hasMore) return
+    if (!hasMore || !autoLoad) return
     const el = sentinelRef.current
     if (!el) return
     const observer = new IntersectionObserver(
@@ -63,7 +70,7 @@ export function usePhotoFeed() {
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [hasMore, fetchNext])
+  }, [hasMore, fetchNext, autoLoad])
 
   return { photos, total, loading, error, hasMore, sentinelRef, refresh, loadMore: fetchNext }
 }
