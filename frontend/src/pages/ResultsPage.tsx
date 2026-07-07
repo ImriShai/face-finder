@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -11,18 +11,26 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ChecklistIcon from '@mui/icons-material/Checklist'
 import CloseIcon from '@mui/icons-material/Close'
 import DownloadIcon from '@mui/icons-material/Download'
+import FavoriteIcon from '@mui/icons-material/Favorite'
 import SearchOffIcon from '@mui/icons-material/SearchOff'
+import ToggleButton from '@mui/material/ToggleButton'
 import DownloadQualityMenu from '../components/DownloadQualityMenu'
 import PhotoGallery from '../components/PhotoGallery'
+import { useFavorites } from '../hooks/useFavorites'
 import { downloadZip, type DownloadProgress, type DownloadQuality } from '../services/api'
 import { formatDownloadLabel } from '../utils/format'
+import { loadLastViewed, loadSearchSession } from '../utils/userPrefs'
 import type { SearchMode, SearchResponse } from '../types'
 
 export default function ResultsPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const result = location.state as (SearchResponse & { mode?: SearchMode }) | null
-  const matches = result?.matches ?? []
+  // Fall back to the saved session so a returning user (or a page refresh)
+  // sees their photos without a new selfie.
+  const [result] = useState(
+    () => (location.state as (SearchResponse & { mode?: SearchMode }) | null) ?? loadSearchSession(),
+  )
+  const allMatches = result?.matches ?? []
   const facesDetected = result?.faces_detected ?? 1
   const mode = result?.mode ?? 'union'
 
@@ -32,6 +40,19 @@ export default function ResultsPage() {
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<HTMLElement | null>(null)
+
+  const { favorites, toggleFavorite } = useFavorites()
+  const [likedOnly, setLikedOnly] = useState(false)
+  // Memoized: a fresh array identity every render would reset the gallery's
+  // infinite-scroll paging on unrelated re-renders (download progress, selection).
+  const matches = useMemo(
+    () => (likedOnly ? allMatches.filter((m) => favorites.has(m.photo_id)) : allMatches),
+    [likedOnly, allMatches, favorites],
+  )
+
+  // Checkpoint: the photo the user last previewed, captured once on mount so
+  // the marker doesn't chase the modal while browsing.
+  const [checkpointId] = useState(loadLastViewed)
 
   function toggleSelect(photoId: string) {
     setSelected((prev) => {
@@ -123,6 +144,16 @@ export default function ResultsPage() {
                   </Typography>
                 )}
               </Box>
+              <ToggleButton
+                value="liked"
+                size="small"
+                selected={likedOnly}
+                onChange={() => setLikedOnly((v) => !v)}
+                sx={{ textTransform: 'none', gap: 0.75, px: 1.5 }}
+              >
+                <FavoriteIcon fontSize="small" sx={{ color: likedOnly ? '#ff4569' : 'inherit' }} />
+                Liked
+              </ToggleButton>
               {matches.length > 0 && (
                 <Button startIcon={<ChecklistIcon />} onClick={enterSelectMode}>
                   Select
@@ -143,13 +174,24 @@ export default function ResultsPage() {
               gap: 2,
             }}
           >
-            <SearchOffIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
-            <Typography variant="h6" color="text.secondary">
-              No matching photos were found.
-            </Typography>
-            <Button variant="contained" onClick={() => navigate('/')}>
-              Try Another Selfie
-            </Button>
+            {likedOnly ? (
+              <>
+                <FavoriteIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
+                <Typography variant="h6" color="text.secondary">
+                  No liked photos yet — tap the heart on a photo to save it here.
+                </Typography>
+              </>
+            ) : (
+              <>
+                <SearchOffIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
+                <Typography variant="h6" color="text.secondary">
+                  No matching photos were found.
+                </Typography>
+                <Button variant="contained" onClick={() => navigate('/')}>
+                  Try Another Selfie
+                </Button>
+              </>
+            )}
           </Box>
         ) : (
           <PhotoGallery
@@ -157,6 +199,9 @@ export default function ResultsPage() {
             selectMode={selectMode}
             selected={selected}
             onToggleSelect={toggleSelect}
+            favorites={favorites}
+            onToggleFavorite={toggleFavorite}
+            checkpointId={checkpointId}
           />
         )}
       </Container>

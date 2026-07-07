@@ -10,6 +10,7 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import { downloadPhoto, previewUrl, thumbnailUrl } from '../services/api'
 import { preloadRadius } from '../utils/preload'
 import ConfidenceChip from './ConfidenceChip'
+import FavoriteButton from './FavoriteButton'
 import type { SearchMatch } from '../types'
 
 interface Props {
@@ -17,11 +18,13 @@ interface Props {
   index: number | null
   onClose: () => void
   onNavigate: (index: number) => void
+  favorites?: Set<string>
+  onToggleFavorite?: (photoId: string) => void
 }
 
 const PRELOAD_RADIUS = 3
 
-export default function PhotoModal({ matches, index, onClose, onNavigate }: Props) {
+export default function PhotoModal({ matches, index, onClose, onNavigate, favorites, onToggleFavorite }: Props) {
   const open = index !== null
   const match = index !== null ? matches[index] : null
   const [fullLoaded, setFullLoaded] = useState(false)
@@ -117,6 +120,14 @@ export default function PhotoModal({ matches, index, onClose, onNavigate }: Prop
 
             <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1, alignItems: 'center' }}>
               <ConfidenceChip confidence={match.confidence} />
+              {favorites && onToggleFavorite && (
+                <Box sx={{ bgcolor: 'rgba(0,0,0,0.5)', borderRadius: '50%' }}>
+                  <FavoriteButton
+                    active={favorites.has(match.photo_id)}
+                    onToggle={() => onToggleFavorite(match.photo_id)}
+                  />
+                </Box>
+              )}
               <Tooltip title="Download original">
                 <IconButton
                   size="small"

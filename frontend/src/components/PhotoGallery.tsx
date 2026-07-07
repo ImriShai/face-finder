@@ -1,11 +1,15 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Box from '@mui/material/Box'
+import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import ImageListItem from '@mui/material/ImageListItem'
+import BookmarkIcon from '@mui/icons-material/Bookmark'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import { previewUrl, thumbnailUrl } from '../services/api'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
+import { saveLastViewed } from '../utils/userPrefs'
+import FavoriteButton from './FavoriteButton'
 import PhotoModal from './PhotoModal'
 import ConfidenceChip from './ConfidenceChip'
 import type { SearchMatch } from '../types'
@@ -15,18 +19,45 @@ interface Props {
   selectMode?: boolean
   selected?: Set<string>
   onToggleSelect?: (photoId: string) => void
+  favorites?: Set<string>
+  onToggleFavorite?: (photoId: string) => void
+  /** Photo to mark as "last viewed" and scroll to on mount. */
+  checkpointId?: string | null
 }
 
-export default function PhotoGallery({ matches, selectMode = false, selected, onToggleSelect }: Props) {
-  const { visible, hasMore, sentinelRef } = useInfiniteScroll(matches)
+export default function PhotoGallery({
+  matches,
+  selectMode = false,
+  selected,
+  onToggleSelect,
+  favorites,
+  onToggleFavorite,
+  checkpointId = null,
+}: Props) {
+  const checkpointIndex = checkpointId ? matches.findIndex((m) => m.photo_id === checkpointId) : -1
+  const { visible, hasMore, sentinelRef } = useInfiniteScroll(matches, 20, checkpointIndex)
   const [modalIndex, setModalIndex] = useState<number | null>(null)
   const prefetched = useRef(new Set<string>())
+  const checkpointRef = useRef<HTMLLIElement | null>(null)
+
+  // Bring the last-viewed photo into view once on mount.
+  const scrolledToCheckpoint = useRef(false)
+  useEffect(() => {
+    if (scrolledToCheckpoint.current || !checkpointRef.current) return
+    scrolledToCheckpoint.current = true
+    checkpointRef.current.scrollIntoView({ block: 'center' })
+  }, [visible.length])
+
+  function openPhoto(index: number) {
+    saveLastViewed(matches[index].photo_id)
+    setModalIndex(index)
+  }
 
   function handleCardClick(photoId: string, visibleIndex: number) {
     if (selectMode) {
       onToggleSelect?.(photoId)
     } else {
-      setModalIndex(visibleIndex)
+      openPhoto(visibleIndex)
     }
   }
 
@@ -48,9 +79,11 @@ export default function PhotoGallery({ matches, selectMode = false, selected, on
       >
         {visible.map((match, i) => {
           const isSelected = selected?.has(match.photo_id) ?? false
+          const isCheckpoint = match.photo_id === checkpointId
           return (
             <ImageListItem
               key={match.photo_id}
+              ref={isCheckpoint ? checkpointRef : undefined}
               onClick={() => handleCardClick(match.photo_id, i)}
               onMouseEnter={() => handleMouseEnter(match.photo_id)}
               sx={{
@@ -77,6 +110,27 @@ export default function PhotoGallery({ matches, selectMode = false, selected, on
                   filter: isSelected ? 'brightness(0.75)' : 'none',
                 }}
               />
+
+              {/* Favorite heart */}
+              {favorites && onToggleFavorite && (
+                <Box sx={{ position: 'absolute', top: 4, right: 4 }}>
+                  <FavoriteButton
+                    active={favorites.has(match.photo_id)}
+                    onToggle={() => onToggleFavorite(match.photo_id)}
+                  />
+                </Box>
+              )}
+
+              {/* Last-viewed checkpoint marker */}
+              {isCheckpoint && !selectMode && (
+                <Chip
+                  icon={<BookmarkIcon />}
+                  label="Last viewed"
+                  size="small"
+                  color="primary"
+                  sx={{ position: 'absolute', top: 8, left: 8 }}
+                />
+              )}
 
               {/* Confidence chip (normal mode only) */}
               {!selectMode && (
@@ -111,7 +165,9 @@ export default function PhotoGallery({ matches, selectMode = false, selected, on
           matches={matches}
           index={modalIndex}
           onClose={() => setModalIndex(null)}
-          onNavigate={setModalIndex}
+          onNavigate={openPhoto}
+          favorites={favorites}
+          onToggleFavorite={onToggleFavorite}
         />
       )}
     </>

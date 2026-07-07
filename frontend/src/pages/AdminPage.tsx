@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -11,6 +11,7 @@ import InputAdornment from '@mui/material/InputAdornment'
 import Modal from '@mui/material/Modal'
 import Snackbar from '@mui/material/Snackbar'
 import TextField from '@mui/material/TextField'
+import ToggleButton from '@mui/material/ToggleButton'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
@@ -19,6 +20,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ChecklistIcon from '@mui/icons-material/Checklist'
 import CloseIcon from '@mui/icons-material/Close'
 import DownloadIcon from '@mui/icons-material/Download'
+import FavoriteIcon from '@mui/icons-material/Favorite'
 import LogoutIcon from '@mui/icons-material/Logout'
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
@@ -41,6 +43,8 @@ import {
   type DownloadQuality,
 } from '../services/api'
 import DownloadQualityMenu from '../components/DownloadQualityMenu'
+import FavoriteButton from '../components/FavoriteButton'
+import { useFavorites } from '../hooks/useFavorites'
 import { formatDownloadLabel } from '../utils/format'
 import { preloadRadius } from '../utils/preload'
 import type { Photo } from '../types'
@@ -155,12 +159,20 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<HTMLElement | null>(null)
 
-  const currentPhoto: Photo | null = lightboxIndex !== null ? photos[lightboxIndex] : null
+  // Favorites (per-browser) and liked-only filtering of the loaded feed.
+  const { favorites, toggleFavorite } = useFavorites()
+  const [likedOnly, setLikedOnly] = useState(false)
+  const shownPhotos = useMemo(
+    () => (likedOnly ? photos.filter((p) => favorites.has(p.id)) : photos),
+    [likedOnly, photos, favorites],
+  )
+
+  const currentPhoto: Photo | null = lightboxIndex !== null ? shownPhotos[lightboxIndex] : null
 
   useEffect(() => {
     if (lightboxIndex === null) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' && lightboxIndex < photos.length - 1)
+      if (e.key === 'ArrowRight' && lightboxIndex < shownPhotos.length - 1)
         setLightboxIndex(lightboxIndex + 1)
       if (e.key === 'ArrowLeft' && lightboxIndex > 0)
         setLightboxIndex(lightboxIndex - 1)
@@ -168,20 +180,20 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [lightboxIndex, photos.length])
+  }, [lightboxIndex, shownPhotos.length])
 
   // Prefetch previews within a few positions of the current photo so nearby next/prev feel instant.
   useEffect(() => {
     if (lightboxIndex === null) return
-    preloadRadius(lightboxIndex, photos.length, PRELOAD_RADIUS, (i) => previewUrl(photos[i].id))
-  }, [lightboxIndex, photos])
+    preloadRadius(lightboxIndex, shownPhotos.length, PRELOAD_RADIUS, (i) => previewUrl(shownPhotos[i].id))
+  }, [lightboxIndex, shownPhotos])
 
   // Fetch the next page before the lightbox runs out of loaded photos, so browsing
   // forward never requires closing the lightbox to scroll and trigger a load.
   useEffect(() => {
     if (lightboxIndex === null || !hasMore) return
-    if (photos.length - 1 - lightboxIndex <= PRELOAD_RADIUS) loadMore()
-  }, [lightboxIndex, photos.length, hasMore, loadMore])
+    if (shownPhotos.length - 1 - lightboxIndex <= PRELOAD_RADIUS) loadMore()
+  }, [lightboxIndex, shownPhotos.length, hasMore, loadMore])
 
   function toggleSelect(photoId: string) {
     setSelected((prev) => {
@@ -202,7 +214,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   }
 
   function selectAll() {
-    setSelected(new Set(photos.map((p) => p.id)))
+    setSelected(new Set(shownPhotos.map((p) => p.id)))
   }
 
   async function handleDownloadZip(quality: DownloadQuality) {
@@ -276,10 +288,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             <>
               <Typography variant="h5" sx={{ fontWeight: 700, flex: 1 }}>
                 {selected.size > 0
-                  ? `${selected.size} of ${photos.length} selected`
+                  ? `${selected.size} of ${shownPhotos.length} selected`
                   : `${total.toLocaleString()} photo${total !== 1 ? 's' : ''}`}
               </Typography>
-              <Button onClick={selectAll} disabled={selected.size === photos.length}>
+              <Button onClick={selectAll} disabled={selected.size === shownPhotos.length}>
                 Select all loaded
               </Button>
               <Button
@@ -310,7 +322,17 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 </Typography>
               )}
               <Box sx={{ flex: 1 }} />
-              {photos.length > 0 && (
+              <ToggleButton
+                value="liked"
+                size="small"
+                selected={likedOnly}
+                onChange={() => setLikedOnly((v) => !v)}
+                sx={{ textTransform: 'none', gap: 0.75, px: 1.5 }}
+              >
+                <FavoriteIcon fontSize="small" sx={{ color: likedOnly ? '#ff4569' : 'inherit' }} />
+                Liked
+              </ToggleButton>
+              {shownPhotos.length > 0 && (
                 <Button startIcon={<ChecklistIcon />} onClick={enterSelectMode}>
                   Select
                 </Button>
@@ -331,7 +353,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         )}
 
         {/* Thumbnail grid */}
-        {photos.length > 0 && (
+        {shownPhotos.length > 0 && (
           <Box
             sx={{
               display: 'grid',
@@ -339,7 +361,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               gap: 1.5,
             }}
           >
-            {photos.map((photo, i) => {
+            {shownPhotos.map((photo, i) => {
               const isSelected = selected.has(photo.id)
               return (
                 <Box
@@ -370,6 +392,12 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                       filter: isSelected ? 'brightness(0.75)' : 'none',
                     }}
                   />
+                  <Box sx={{ position: 'absolute', top: 4, right: 4 }}>
+                    <FavoriteButton
+                      active={favorites.has(photo.id)}
+                      onToggle={() => toggleFavorite(photo.id)}
+                    />
+                  </Box>
                   {selectMode && (
                     <Box sx={{ position: 'absolute', top: 6, left: 6 }}>
                       {isSelected
@@ -390,6 +418,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           {!loading && photos.length === 0 && !error && (
             <Typography color="text.secondary">
               No photos yet. Upload a gallery above.
+            </Typography>
+          )}
+          {!loading && !hasMore && likedOnly && photos.length > 0 && shownPhotos.length === 0 && (
+            <Typography color="text.secondary">
+              No liked photos yet — tap the heart on a photo to save it here.
             </Typography>
           )}
         </Box>
@@ -441,6 +474,12 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
                 {/* top-right actions */}
                 <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}>
+                  <Box sx={{ bgcolor: 'rgba(0,0,0,0.5)', borderRadius: '50%' }}>
+                    <FavoriteButton
+                      active={favorites.has(currentPhoto.id)}
+                      onToggle={() => toggleFavorite(currentPhoto.id)}
+                    />
+                  </Box>
                   <Tooltip title="Download photo">
                     <IconButton
                       size="small"

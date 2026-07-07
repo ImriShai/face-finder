@@ -10,8 +10,10 @@ import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import FaceIcon from '@mui/icons-material/Face'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import HistoryIcon from '@mui/icons-material/History'
 import UploadDropzone from '../components/UploadDropzone'
 import { searchByFace } from '../services/api'
+import { loadSearchSession, saveSearchSession } from '../utils/userPrefs'
 import type { SearchMode } from '../types'
 
 const MODE_LABELS: Record<SearchMode, string> = {
@@ -26,12 +28,17 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
+  // Results of this browser's previous search — lets a returning user skip
+  // the selfie entirely.
+  const [savedSession] = useState(loadSearchSession)
+
   const handleSearch = async () => {
     if (!file) return
     setLoading(true)
     setError(null)
     try {
       const result = await searchByFace(file, mode)
+      saveSearchSession({ ...result, mode })
       navigate('/results', { state: { ...result, mode } })
     } catch {
       setError('Search failed. Please try again.')
@@ -103,6 +110,21 @@ export default function HomePage() {
         >
           {loading ? 'Searching…' : 'Find My Photos'}
         </Button>
+
+        {savedSession && savedSession.matches.length > 0 && (
+          <Button
+            variant="outlined"
+            size="large"
+            fullWidth
+            sx={{ mt: 1.5, py: 1.25, textTransform: 'none' }}
+            startIcon={<HistoryIcon />}
+            disabled={loading}
+            onClick={() => navigate('/results')}
+          >
+            Continue where you left off — {savedSession.matches.length} photo
+            {savedSession.matches.length !== 1 ? 's' : ''} from your last search
+          </Button>
+        )}
 
         <Box sx={{ mt: 4, textAlign: 'center' }}>
           <Button
