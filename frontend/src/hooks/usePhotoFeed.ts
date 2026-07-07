@@ -31,7 +31,12 @@ export function usePhotoFeed(autoLoad = true) {
       const res = await listPhotos(pageRef.current, PAGE_SIZE)
       if (fetchKeyRef.current !== key) return  // reset while request was in-flight
       setTotal(res.total)
-      setPhotos((prev) => [...prev, ...res.photos])
+      // Dedup by id: any page overlap would create duplicate React keys in the
+      // grid, which corrupts reconciliation and strands orphaned cards in the DOM.
+      setPhotos((prev) => {
+        const seen = new Set(prev.map((p) => p.id))
+        return [...prev, ...res.photos.filter((p) => !seen.has(p.id))]
+      })
       if (res.photos.length < PAGE_SIZE) exhaustedRef.current = true
       else pageRef.current += 1
     } catch {

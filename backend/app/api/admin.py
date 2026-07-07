@@ -169,7 +169,9 @@ async def list_photos(
     page_size = min(max(page_size, 1), 100)
     offset = (page - 1) * page_size
 
-    base = select(Photo).order_by(Photo.created_at.desc())
+    # id as tiebreaker: created_at alone is non-unique (batch ingestion), and an
+    # unstable ORDER BY makes OFFSET pagination return duplicate/skipped rows.
+    base = select(Photo).order_by(Photo.created_at.desc(), Photo.id.desc())
     count_base = select(func.count(Photo.id))
 
     total = await db.scalar(count_base) or 0
