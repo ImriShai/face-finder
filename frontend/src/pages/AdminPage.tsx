@@ -38,7 +38,9 @@ import {
   saveAdminPassword,
   thumbnailUrl,
   type DownloadProgress,
+  type DownloadQuality,
 } from '../services/api'
+import DownloadQualityMenu from '../components/DownloadQualityMenu'
 import { formatDownloadLabel } from '../utils/format'
 import { preloadRadius } from '../utils/preload'
 import type { Photo } from '../types'
@@ -151,6 +153,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [downloading, setDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<HTMLElement | null>(null)
 
   const currentPhoto: Photo | null = lightboxIndex !== null ? photos[lightboxIndex] : null
 
@@ -202,13 +205,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     setSelected(new Set(photos.map((p) => p.id)))
   }
 
-  async function handleDownloadZip() {
+  async function handleDownloadZip(quality: DownloadQuality) {
+    setDownloadMenuAnchor(null)
     if (selected.size === 0) return
     setDownloading(true)
     setDownloadProgress(null)
     setDownloadError(null)
     try {
-      await downloadZip(Array.from(selected), 'gallery-selection.zip', setDownloadProgress)
+      await downloadZip(Array.from(selected), quality, 'gallery-selection.zip', setDownloadProgress)
     } catch {
       setDownloadError('Download failed. Please try again.')
     } finally {
@@ -282,10 +286,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 variant="contained"
                 startIcon={downloading ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
                 disabled={selected.size === 0 || downloading}
-                onClick={handleDownloadZip}
+                onClick={(e) => setDownloadMenuAnchor(e.currentTarget)}
               >
                 {downloadLabel}
               </Button>
+              <DownloadQualityMenu
+                anchorEl={downloadMenuAnchor}
+                onClose={() => setDownloadMenuAnchor(null)}
+                onSelect={handleDownloadZip}
+              />
               <Button onClick={cancelSelectMode} color="inherit">
                 Cancel
               </Button>

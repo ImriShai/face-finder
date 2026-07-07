@@ -13,7 +13,14 @@ from app.database.session import AsyncSessionLocal, get_db
 from app.face.faiss_index import faiss_index
 from app.models.photo import Photo
 from app.schemas.photo import PhotoListResponse, PhotoResponse
-from app.storage.storage_service import ALLOWED_IMAGE_EXTENSIONS, THUMBNAIL_EXT, create_preview, create_thumbnail, extract_zip
+from app.storage.storage_service import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    THUMBNAIL_EXT,
+    create_thumbnail,
+    ensure_preview,
+    extract_zip,
+    preview_path,
+)
 from app.workers.gallery_worker import process_gallery
 
 logger = logging.getLogger(__name__)
@@ -130,15 +137,14 @@ async def _regen_previews_task() -> None:
         photos = result.scalars().all()
 
     for photo in photos:
-        preview_path = os.path.join(settings.PREVIEWS_DIR, f"{photo.id}.webp")
         try:
-            if os.path.exists(preview_path):
+            if os.path.exists(preview_path(photo.id)):
                 skipped += 1
                 continue
             if not os.path.exists(photo.original_path):
                 skipped += 1
                 continue
-            await loop.run_in_executor(None, create_preview, photo.original_path, preview_path)
+            await loop.run_in_executor(None, ensure_preview, photo.original_path, photo.id)
             ok += 1
         except Exception:
             logger.exception("Failed to generate preview for photo %s", photo.id)

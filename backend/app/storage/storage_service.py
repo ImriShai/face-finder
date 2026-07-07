@@ -1,9 +1,12 @@
 import os
 import re
+import uuid
 import zipfile
 from pathlib import Path
 
 from PIL import Image
+
+from app.config import settings
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif"}
 
@@ -73,7 +76,16 @@ def _save_resized(img: Image.Image, dest_path: str, max_size: tuple[int, int]) -
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     img = img.convert("RGB")
     img.thumbnail(max_size, Image.LANCZOS)
-    img.save(dest_path, "WEBP", quality=85, method=4)
+    # Write to a temp file and rename: concurrent readers (FileResponse, zip
+    # streaming) never see a half-written image, and a crash mid-save can't
+    # leave a truncated file that later exists-checks would trust.
+    tmp_path = f"{dest_path}.{uuid.uuid4().hex}.tmp"
+    try:
+        img.save(tmp_path, "WEBP", quality=85, method=4)
+        os.replace(tmp_path, dest_path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 def create_thumbnail(source_path: str, dest_path: str) -> None:
@@ -84,3 +96,18 @@ def create_thumbnail(source_path: str, dest_path: str) -> None:
 def create_preview(source_path: str, dest_path: str) -> None:
     with Image.open(source_path) as img:
         _save_resized(img, dest_path, PREVIEW_SIZE)
+
+
+def preview_path(photo_id: uuid.UUID | str) -> str:
+    return os.path.join(settings.PREVIEWS_DIR, f"{photo_id}{PREVIEW_EXT}")
+
+
+def ensure_preview(source_path: str, photo_id: uuid.UUID | str) -> str:
+    """Return the photo's preview path, generating the preview if missing.
+
+    Blocking (PIL decode/encode) — call via an executor from async code.
+    """
+    dest = preview_path(photo_id)
+    if not os.path.exists(dest):
+        create_preview(source_path, dest)
+    return dest

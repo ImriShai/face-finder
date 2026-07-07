@@ -1,5 +1,7 @@
 import io
+import os
 import zipfile
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -67,11 +69,29 @@ async def test_web_entries_are_smaller_than_originals(
     await db_session.commit()
 
     [(web_path, _)] = await download_service.resolve_entries([photo.id], db_session, quality="web")
-    import os
 
     assert os.path.getsize(web_path) < os.path.getsize(str(original))
     with Image.open(web_path) as img:
         assert max(img.size) <= 2000
+
+
+async def test_web_quality_falls_back_to_original_for_corrupt_photo(
+    db_session: AsyncSession, photos: list[Photo], tmp_path
+):
+    corrupt = tmp_path / "corrupt.jpg"
+    corrupt.write_bytes(b"not a real image")
+    photo = Photo(filename="corrupt.jpg", original_path=str(corrupt), thumbnail_path="")
+    db_session.add(photo)
+    await db_session.commit()
+
+    entries = await download_service.resolve_entries(
+        [photos[0].id, photo.id], db_session, quality="web"
+    )
+
+    # The healthy photo gets its preview; the corrupt one falls back to the
+    # original file instead of failing the whole batch.
+    assert entries[0][1] == "first.webp"
+    assert entries[1] == (str(corrupt), "corrupt.jpg")
 
 
 def test_stream_zip_produces_valid_archive(tmp_path):
@@ -87,7 +107,7 @@ def test_stream_zip_produces_valid_archive(tmp_path):
         assert zf.namelist() == ["a.jpg", "b.jpg"]
         assert zf.testzip() is None
         for path, name in paths:
-            assert zf.read(name) == open(path, "rb").read()
+            assert zf.read(name) == Path(path).read_bytes()
 
 
 def test_token_roundtrip():

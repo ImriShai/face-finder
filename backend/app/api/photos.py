@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.storage.storage_service import create_preview
+from app.storage.storage_service import ensure_preview, preview_path
 
 from app.api.deps import verify_viewer
 from app.config import settings
@@ -51,14 +51,14 @@ async def get_photo(photo_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> 
 
 @router.get("/photos/{photo_id}/preview")
 async def get_preview(photo_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> FileResponse:
-    preview_path = os.path.join(settings.PREVIEWS_DIR, f"{photo_id}.webp")
-    if not os.path.exists(preview_path):
+    path = preview_path(photo_id)
+    if not os.path.exists(path):
         photo = await _get_photo_or_404(photo_id, db)
         if not os.path.exists(photo.original_path):
             raise HTTPException(404, "Photo file not found on disk")
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, create_preview, photo.original_path, preview_path)
-    return FileResponse(preview_path, media_type="image/webp", headers={"Cache-Control": _CACHE_FOREVER})
+        path = await loop.run_in_executor(None, ensure_preview, photo.original_path, photo_id)
+    return FileResponse(path, media_type="image/webp", headers={"Cache-Control": _CACHE_FOREVER})
 
 
 @router.get("/thumbnails/{photo_id}")

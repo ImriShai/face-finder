@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import secrets
 import shutil
@@ -7,16 +8,19 @@ import time
 import uuid
 import zipfile
 from pathlib import Path
-from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.photo import Photo
-from app.storage.storage_service import PREVIEW_EXT, create_preview
+from app.schemas.photo import DownloadQuality
+from app.storage.storage_service import PREVIEW_EXT, ensure_preview
 
-DownloadQuality = Literal["original", "web"]
+logger = logging.getLogger(__name__)
+
+# Bound concurrent preview generation per request: enough to use several cores
+# on a cold cache without starving the shared default executor.
+_PREVIEW_CONCURRENCY = 4
 
 _COPY_BUF = 1 << 20  # 1 MB — vs zipfile's hardcoded 8 KB default
 
@@ -91,24 +95,32 @@ async def resolve_entries(
 ) -> list[tuple[str, str]]:
     result = await db.execute(select(Photo).where(Photo.id.in_(photo_ids)))
     photos_by_id = {p.id: p for p in result.scalars().all()}
+    photos = [
+        photos_by_id[pid]
+        for pid in photo_ids
+        if pid in photos_by_id and os.path.exists(photos_by_id[pid].original_path)
+    ]
+    if quality != "web":
+        return [(p.original_path, p.filename) for p in photos]
 
-    entries: list[tuple[str, str]] = []
+    # Web quality reuses the 2000px previews generated at ingestion — ~50x
+    # smaller than originals, which is what makes downloads fast on phone/Wi-Fi
+    # connections. Missing previews are generated concurrently (bounded); a
+    # photo whose preview can't be built (e.g. corrupt original) falls back to
+    # its original file rather than failing the whole batch.
     loop = asyncio.get_running_loop()
-    for pid in photo_ids:
-        photo = photos_by_id.get(pid)
-        if photo is None or not os.path.exists(photo.original_path):
-            continue
-        if quality == "web":
-            # Web quality reuses the 2000px previews generated at ingestion —
-            # ~50x smaller than originals, which is what makes downloads fast
-            # on phone/Wi-Fi connections.
-            preview_path = os.path.join(settings.PREVIEWS_DIR, f"{photo.id}{PREVIEW_EXT}")
-            if not os.path.exists(preview_path):
-                await loop.run_in_executor(None, create_preview, photo.original_path, preview_path)
-            entries.append((preview_path, f"{Path(photo.filename).stem}{PREVIEW_EXT}"))
-        else:
-            entries.append((photo.original_path, photo.filename))
-    return entries
+    semaphore = asyncio.Semaphore(_PREVIEW_CONCURRENCY)
+
+    async def _web_entry(photo: Photo) -> tuple[str, str]:
+        try:
+            async with semaphore:
+                path = await loop.run_in_executor(None, ensure_preview, photo.original_path, photo.id)
+            return (path, f"{Path(photo.filename).stem}{PREVIEW_EXT}")
+        except Exception:
+            logger.warning("Preview generation failed for photo %s; using original", photo.id, exc_info=True)
+            return (photo.original_path, photo.filename)
+
+    return list(await asyncio.gather(*(_web_entry(p) for p in photos)))
 
 
 def estimate_zip_size(entries: list[tuple[str, str]]) -> int:

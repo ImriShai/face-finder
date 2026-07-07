@@ -20,9 +20,12 @@ class PhotoListResponse(BaseModel):
     photos: list[PhotoResponse]
 
 
+DownloadQuality = Literal["original", "web"]
+
+
 class DownloadZipRequest(BaseModel):
     photo_ids: list[uuid.UUID]
-    quality: Literal["original", "web"] = "original"
+    quality: DownloadQuality = "original"
 
     @field_validator("photo_ids")
     @classmethod

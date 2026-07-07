@@ -9,7 +9,7 @@ import numpy as np
 from app.config import settings
 from app.face.face_service import face_service
 from app.face.faiss_index import faiss_index
-from app.storage.storage_service import PREVIEW_EXT, THUMBNAIL_EXT, create_preview, create_thumbnail
+from app.storage.storage_service import THUMBNAIL_EXT, create_thumbnail, ensure_preview
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +62,7 @@ async def process_gallery(zip_path: str, extracted_paths: list[str]) -> None:
                 await loop.run_in_executor(None, create_thumbnail, image_path, thumb_path)
                 photo.thumbnail_path = thumb_path
 
-                preview_path = os.path.join(settings.PREVIEWS_DIR, f"{photo_id}{PREVIEW_EXT}")
-                await loop.run_in_executor(None, create_preview, image_path, preview_path)
+                await loop.run_in_executor(None, ensure_preview, image_path, photo_id)
 
                 faces = await face_service.detect_faces(img)
                 if faces:

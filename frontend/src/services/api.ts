@@ -110,9 +110,9 @@ const PROGRESS_INTERVAL_MS = 150
 
 export async function downloadZip(
   photoIds: string[],
+  quality: DownloadQuality,
   zipName = 'photos.zip',
   onProgress?: (progress: DownloadProgress) => void,
-  quality: DownloadQuality = 'web',
 ): Promise<void> {
   // Step 1: resolve photo paths server-side and get a short-lived token plus an estimated size (~instant).
   const { data } = await viewerClient.post<{ token: string; estimated_size: number }>(
