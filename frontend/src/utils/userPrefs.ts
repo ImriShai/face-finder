@@ -4,7 +4,7 @@ import type { SearchMode, SearchResponse } from '../types'
 // so favorites, the cached search session, and the last-viewed checkpoint are
 // scoped to this browser via localStorage.
 
-const FAVORITES_KEY = 'ff_favorite_photo_ids'
+export const FAVORITES_KEY = 'ff_favorite_photo_ids'
 const SEARCH_SESSION_KEY = 'ff_last_search'
 const LAST_VIEWED_KEY = 'ff_last_viewed_photo'
 

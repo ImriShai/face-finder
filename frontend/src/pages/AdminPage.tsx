@@ -159,7 +159,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [downloadMenuAnchor, setDownloadMenuAnchor] = useState<HTMLElement | null>(null)
 
   // Favorites (per-browser) and liked-only filtering.
-  const { favorites, toggleFavorite } = useFavorites()
+  const { favorites, toggleFavorite, clearFavorites } = useFavorites()
   const [likedOnly, setLikedOnly] = useState(false)
   const { photos, total, loading, error, hasMore, sentinelRef, refresh, loadMore } = usePhotoFeed(!likedOnly)
   const shownPhotos = useMemo<Photo[]>(() => {
@@ -338,6 +338,17 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 <FavoriteIcon fontSize="small" sx={{ color: likedOnly ? '#ff4569' : 'inherit' }} />
                 Liked
               </ToggleButton>
+              {likedOnly && favorites.size > 0 && (
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={() => {
+                    if (window.confirm(`Remove all ${favorites.size} liked photos?`)) clearFavorites()
+                  }}
+                >
+                  Clear liked
+                </Button>
+              )}
               {shownPhotos.length > 0 && (
                 <Button startIcon={<ChecklistIcon />} onClick={enterSelectMode}>
                   Select
