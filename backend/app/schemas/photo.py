@@ -23,15 +23,23 @@ class PhotoListResponse(BaseModel):
 DownloadQuality = Literal["original", "web"]
 
 
-class DownloadZipRequest(BaseModel):
+class PhotoIdsRequest(BaseModel):
     photo_ids: list[uuid.UUID]
+
+    @field_validator("photo_ids")
+    @classmethod
+    def validate_not_empty(cls, v: list[uuid.UUID]) -> list[uuid.UUID]:
+        if not v:
+            raise ValueError("At least one photo ID is required")
+        return v
+
+
+class DownloadZipRequest(PhotoIdsRequest):
     quality: DownloadQuality = "original"
 
     @field_validator("photo_ids")
     @classmethod
     def validate_count(cls, v: list[uuid.UUID]) -> list[uuid.UUID]:
-        if not v:
-            raise ValueError("At least one photo ID is required")
         if len(v) > 500:
             raise ValueError("Maximum 500 photos per ZIP download")
         return v

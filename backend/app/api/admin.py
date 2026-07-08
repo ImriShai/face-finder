@@ -12,7 +12,7 @@ from app.config import settings
 from app.database.session import AsyncSessionLocal, get_db
 from app.face.faiss_index import faiss_index
 from app.models.photo import Photo
-from app.schemas.photo import PhotoListResponse, PhotoResponse
+from app.schemas.photo import PhotoIdsRequest, PhotoListResponse, PhotoResponse
 from app.services.export_service import build_photos_csv
 from app.storage.storage_service import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -161,12 +161,18 @@ async def regen_previews(background_tasks: BackgroundTasks) -> dict:
     return {"status": "started"}
 
 
-@router.get("/photos/export.csv", dependencies=[Depends(verify_admin)])
-async def export_photos_csv(db: AsyncSession = Depends(get_db)) -> Response:
-    result = await db.execute(select(Photo).order_by(Photo.created_at.desc(), Photo.id.desc()))
-    csv_text = build_photos_csv(result.scalars().all())
+@router.post("/photos/export.csv", dependencies=[Depends(verify_admin)])
+async def export_photos_csv(request: PhotoIdsRequest, db: AsyncSession = Depends(get_db)) -> Response:
+    result = await db.execute(
+        select(Photo)
+        .where(Photo.id.in_(request.photo_ids))
+        .order_by(Photo.created_at.desc(), Photo.id.desc())
+    )
+    photos = result.scalars().all()
+    if not photos:
+        raise HTTPException(404, "None of the requested photos exist")
     return Response(
-        content=csv_text,
+        content=build_photos_csv(photos),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="photos.csv"'},
     )

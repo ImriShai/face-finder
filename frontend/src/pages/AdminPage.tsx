@@ -242,8 +242,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   }
 
   async function handleExportCsv() {
+    if (selected.size === 0) return
     try {
-      await exportPhotosCsv()
+      await exportPhotosCsv(Array.from(selected))
     } catch {
       setDownloadError('Export failed. Please try again.')
     }
@@ -323,6 +324,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 onClose={() => setDownloadMenuAnchor(null)}
                 onSelect={handleDownloadZip}
               />
+              <Button
+                startIcon={<TableViewIcon />}
+                disabled={selected.size === 0}
+                onClick={handleExportCsv}
+              >
+                Export CSV
+              </Button>
               <Button onClick={cancelSelectMode} color="inherit">
                 Cancel
               </Button>
@@ -362,11 +370,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               {shownPhotos.length > 0 && (
                 <Button startIcon={<ChecklistIcon />} onClick={enterSelectMode}>
                   Select
-                </Button>
-              )}
-              {photos.length > 0 && (
-                <Button startIcon={<TableViewIcon />} onClick={handleExportCsv}>
-                  Export CSV
                 </Button>
               )}
               <Tooltip title="Refresh">
