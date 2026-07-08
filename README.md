@@ -5,7 +5,8 @@ Upload a selfie, get back every photo from an event gallery you appear in.
 An admin uploads a ZIP of event photos → the backend detects every face, generates
 embeddings, and indexes them in FAISS. A guest then uploads a selfie → the backend
 embeds it and returns every photo whose faces match above a configurable similarity
-threshold, sorted by confidence.
+threshold, sorted by confidence. Guests can favorite photos, download selections as a
+ZIP in web or original quality, and come back later without retaking a selfie.
 
 ## Contents
 
@@ -94,9 +95,12 @@ backend directly).
 | `POSTGRES_USER`      | postgres, backend  | DB username                                                            |
 | `POSTGRES_PASSWORD`  | postgres, backend  | DB password                                                            |
 | `POSTGRES_DB`        | postgres, backend  | DB name                                                                |
-| `DATABASE_URL`       | backend            | Full async SQLAlchemy URL, e.g. `postgresql+asyncpg://user:pass@postgres:5432/db` |
-| `ADMIN_PASSWORD`     | backend, frontend  | Required for all `/admin/*` endpoints (sent as `X-Admin-Password` header) |
-| `VIEWER_PASSWORD`    | backend, frontend  | If non-empty, gates `/search` and photo/download endpoints behind a login cookie. Leave empty to make the site public |
+| `DATABASE_URL`       | backend            | **Required** (no default in source). Full async SQLAlchemy URL, e.g. `postgresql+asyncpg://user:pass@postgres:5432/db` |
+| `ADMIN_PASSWORD`     | backend, frontend  | **Required** (no default in source). Guards all `/admin/*` endpoints (sent as `X-Admin-Password` header) |
+| `VIEWER_PASSWORD`    | backend, frontend  | If non-empty, gates `/search` and photo/download endpoints behind a login cookie. Leave empty (the default) to make the site public |
+
+`DATABASE_URL` and `ADMIN_PASSWORD` are deliberately required — the backend fails fast at
+startup if they're missing rather than falling back to a credential baked into the code.
 
 Other tunables live only in `app/config.py` (edit and rebuild, or override via env vars of
 the same name — every `Settings` field is env-overridable):
@@ -118,11 +122,35 @@ the same name — every `Settings` field is env-overridable):
    thumbnails/previews, detects faces, embeds them, and indexes them — all in a background
    task, so the upload request returns immediately with a queued count.
 3. Watch the gallery grid fill in as ingestion proceeds (refresh or re-open Admin).
-4. On the homepage, a guest uploads a selfie (drag-and-drop) and clicks **Find Photos**.
+4. On the homepage, a guest uploads a selfie (drag-and-drop) and clicks **Find My Photos**.
    If multiple faces are in the selfie, the largest one is used. Results are sorted by
    confidence, with an empty state if nothing matches.
 5. From the results page (or Admin gallery), select photos and download them individually
    or as a ZIP; a progress bar shows percentage and estimated size while it streams.
+   The ZIP download offers two qualities: **Web size** (the ~2000px WebP previews, ~50×
+   smaller — the right choice on phone/Wi-Fi connections) or **Original quality**
+   (full-resolution files).
+
+### Favorites, sessions, and pick-up-where-you-left-off
+
+All three are stored per browser in `localStorage` (the app has no user accounts):
+
+- **Favorites** — every photo card and lightbox has a small heart (results page and Admin
+  gallery). A **Liked** toggle on both pages filters to hearted photos; it composes with
+  selection, so *filter to liked → select all → download ZIP / export CSV* works. Admin
+  additionally gets a **Clear liked** button. Hearts sync live across open tabs.
+- **Saved search session** — results are cached after each search, so refreshing the
+  results page keeps them, and the homepage shows *"Continue where you left off"* so a
+  returning guest doesn't need to retake a selfie. Sessions expire after 30 days.
+- **Last-viewed checkpoint** — the last photo previewed in the modal is remembered; on
+  return, the gallery reveals up to it, scrolls to it, and marks it with a *Last viewed*
+  chip.
+
+### Admin CSV export
+
+In the Admin gallery's select mode, **Export CSV** downloads `photos.csv` for the selected
+photos with columns `id`, `filename` (the original name from the uploaded ZIP), and
+`created_at`.
 
 ---
 
@@ -272,14 +300,15 @@ strip the `/api` prefix). Interactive docs: `GET /docs`.
 | `GET /photos/{id}`                     | viewer          | Original photo file |
 | `GET /photos/{id}/preview`             | viewer          | ~2000px WebP preview (generated on first request) |
 | `GET /thumbnails/{id}`                 | none            | 400×400 thumbnail |
-| `POST /photos/download-zip-token`      | viewer          | Resolve a photo-ID selection to a short-lived download token + estimated ZIP size |
-| `GET /photos/download-zip/{token}`     | token           | Streams the ZIP for a token from `download-zip-token` |
+| `POST /photos/download-zip-token`      | viewer          | Resolve a photo-ID selection (plus `quality`: `"original"` \| `"web"`) to a short-lived download token + estimated ZIP size |
+| `GET /photos/download-zip/{token}`     | token           | Streams the ZIP for a token from `download-zip-token` (single-use, 5-minute TTL) |
 | `POST /admin/upload-gallery`           | admin           | Upload a ZIP of event photos (background-processed) |
 | `POST /admin/reload-index`             | admin           | Hot-swap the in-memory FAISS index from disk |
 | `GET /admin/index-status`              | admin           | In-memory vs on-disk FAISS vector counts |
 | `POST /admin/regen-thumbnails`         | admin           | Regenerate all thumbnails as WebP (background) |
 | `POST /admin/regen-previews`           | admin           | Generate missing previews (background) |
-| `GET /admin/photos`                    | admin           | Paginated photo list for the admin gallery |
+| `GET /admin/photos`                    | admin           | Paginated photo list for the admin gallery (stable `created_at, id` ordering) |
+| `POST /admin/photos/export.csv`        | admin           | CSV (`id`, `filename`, `created_at`) for the given photo IDs |
 
 "admin" auth = `X-Admin-Password` header. "viewer" auth = `viewer_token` cookie (set via
 `/auth/login`) or `X-Viewer-Password` header; both are no-ops if `VIEWER_PASSWORD` is unset.
@@ -317,9 +346,13 @@ Inside the backend container (the `storage_data` volume in Compose):
 /storage/
   gallery/       # original uploaded photos, sanitized filenames
   thumbnails/    # <photo_id>.webp, 400×400
-  previews/      # <photo_id>.webp, ~2000px, generated lazily on first request
+  previews/      # <photo_id>.webp, ~2000px — generated at ingestion (or on demand),
+                 # served by the preview endpoint and reused for web-size ZIP downloads
   faiss.index    # binary FAISS index file
 ```
+
+Previews are written atomically (temp file + rename), so concurrent readers never see a
+half-written image and a crash can't leave a truncated file behind.
 
 The InsightFace model itself is cached separately in `/root/.insightface` inside the
 container, backed by the `insightface_models` named volume — so it survives container
@@ -335,7 +368,7 @@ Selfies uploaded for search are processed entirely in memory and are never writt
 backend/
   app/
     api/          # thin FastAPI routers (admin, auth, health, photos, search)
-    services/      # business logic (search_service, storage_service helpers)
+    services/      # business logic (search_service, download_service, export_service)
     face/          # InsightFace wrapper (face_service) + FAISS index (faiss_index)
     database/      # SQLAlchemy session/engine setup
     models/        # SQLAlchemy ORM models (Photo, DetectedFace)
@@ -349,10 +382,10 @@ backend/
 frontend/
   src/
     pages/         # HomePage, ResultsPage, AdminPage
-    components/     # PhotoGallery, PhotoModal, ZipUploader, ConfidenceChip, ...
+    components/     # PhotoGallery, PhotoModal, DownloadQualityMenu, FavoriteButton, ...
     services/       # api.ts — all backend calls
-    hooks/          # usePhotoFeed (paginated/infinite-scroll admin gallery)
-    utils/          # formatBytes, preloadRadius
+    hooks/          # usePhotoFeed (admin feed), useInfiniteScroll, useFavorites
+    utils/          # userPrefs (favorites/session/checkpoint), formatBytes, preloadRadius
     types/
 ```
 
@@ -374,3 +407,7 @@ frontend/
 - **Frontend can't reach the backend in dev** — `npm run dev` proxies `/api` to
   `http://localhost:8000` (see `frontend/vite.config.ts`); make sure the backend is running
   on that port, or edit the proxy target.
+- **Browser shows the old UI after a deploy** — nginx serves `index.html` with
+  `Cache-Control: no-cache` (hash-named assets are cached for a year), so a plain reload
+  picks up new builds. A tab that was already open keeps running the old bundle until it's
+  reloaded.
