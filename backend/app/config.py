@@ -13,8 +13,12 @@ class Settings(BaseSettings):
     MATCH_THRESHOLD: float = 0.45
     SEARCH_RATE_LIMIT: str = "10/minute"
     INSIGHTFACE_MODEL: str = "buffalo_l"
-    ADMIN_PASSWORD: str = "***REMOVED***"
-    VIEWER_PASSWORD: str = "***REMOVED***"  
+    # Required — no default, so a deployment without it fails fast instead of
+    # shipping a known password (and an empty-string default would make the
+    # admin check pass for a blank X-Admin-Password header).
+    ADMIN_PASSWORD: str
+    # Empty disables the viewer gate (see /auth/config).
+    VIEWER_PASSWORD: str = ""
     model_config = {"env_file": ".env"}
 
 
