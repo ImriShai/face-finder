@@ -26,6 +26,7 @@ import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import TableViewIcon from '@mui/icons-material/TableView'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import ZipUploader from '../components/ZipUploader'
@@ -34,6 +35,7 @@ import {
   clearAdminPassword,
   downloadPhoto,
   downloadZip,
+  exportPhotosCsv,
   getAdminPassword,
   listPhotos,
   previewUrl,
@@ -239,6 +241,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  async function handleExportCsv() {
+    try {
+      await exportPhotosCsv()
+    } catch {
+      setDownloadError('Export failed. Please try again.')
+    }
+  }
+
   const downloadLabel = formatDownloadLabel(downloading, downloadProgress, selected.size)
 
   function handleCardClick(photoId: string, index: number) {
@@ -352,6 +362,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               {shownPhotos.length > 0 && (
                 <Button startIcon={<ChecklistIcon />} onClick={enterSelectMode}>
                   Select
+                </Button>
+              )}
+              {photos.length > 0 && (
+                <Button startIcon={<TableViewIcon />} onClick={handleExportCsv}>
+                  Export CSV
                 </Button>
               )}
               <Tooltip title="Refresh">

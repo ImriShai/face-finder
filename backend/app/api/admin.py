@@ -4,7 +4,7 @@ import os
 import tempfile
 
 import faiss
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from app.database.session import AsyncSessionLocal, get_db
 from app.face.faiss_index import faiss_index
 from app.models.photo import Photo
 from app.schemas.photo import PhotoListResponse, PhotoResponse
+from app.services.export_service import build_photos_csv
 from app.storage.storage_service import (
     ALLOWED_IMAGE_EXTENSIONS,
     THUMBNAIL_EXT,
@@ -158,6 +159,17 @@ async def regen_previews(background_tasks: BackgroundTasks) -> dict:
     """Generate 2000px WebP previews for all photos in the background."""
     background_tasks.add_task(_regen_previews_task)
     return {"status": "started"}
+
+
+@router.get("/photos/export.csv", dependencies=[Depends(verify_admin)])
+async def export_photos_csv(db: AsyncSession = Depends(get_db)) -> Response:
+    result = await db.execute(select(Photo).order_by(Photo.created_at.desc(), Photo.id.desc()))
+    csv_text = build_photos_csv(result.scalars().all())
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="photos.csv"'},
+    )
 
 
 @router.get("/photos", response_model=PhotoListResponse, dependencies=[Depends(verify_admin)])

@@ -165,6 +165,12 @@ export async function uploadGallery(
   return data
 }
 
+/** Download a CSV of all photos' ids and original filenames (admin only). */
+export async function exportPhotosCsv(): Promise<void> {
+  const res = await adminClient().get('/admin/photos/export.csv', { responseType: 'blob' })
+  triggerBlobDownload(res.data as Blob, 'photos.csv')
+}
+
 export async function listPhotos(page = 1, pageSize = 48): Promise<PhotoListResponse> {
   const { data } = await adminClient().get<PhotoListResponse>('/admin/photos', {
     params: { page, page_size: pageSize },
