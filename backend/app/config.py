@@ -2,7 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "***REMOVED***"
+    # Required from the environment — connection strings carry credentials
+    # and don't belong in source.
+    DATABASE_URL: str
     STORAGE_DIR: str = "/storage"
     GALLERY_DIR: str = "/storage/gallery"
     THUMBNAILS_DIR: str = "/storage/thumbnails"
