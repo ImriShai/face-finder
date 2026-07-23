@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import PauseIcon from '@mui/icons-material/Pause'
@@ -22,6 +23,7 @@ interface Props {
  * - aria-hidden: decorative, invisible to screen readers
  */
 export default function BackgroundVideo({ src, poster, overlayOpacity = 0.35 }: Props) {
+  const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [reducedMotion, setReducedMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -108,7 +110,7 @@ export default function BackgroundVideo({ src, poster, overlayOpacity = 0.35 }: 
         <Box sx={{ position: 'fixed', bottom: 12, insetInlineStart: 12, zIndex: 3, display: 'flex', gap: 1 }}>
           <IconButton
             onClick={toggleMute}
-            aria-label={muted ? 'Unmute background video' : 'Mute background video'}
+            aria-label={muted ? t('backgroundvideo.unmute') : t('backgroundvideo.mute')}
             size="small"
             sx={btnSx}
           >
@@ -116,7 +118,7 @@ export default function BackgroundVideo({ src, poster, overlayOpacity = 0.35 }: 
           </IconButton>
           <IconButton
             onClick={togglePlay}
-            aria-label={playing ? 'Pause background video' : 'Play background video'}
+            aria-label={playing ? t('backgroundvideo.pause') : t('backgroundvideo.play')}
             size="small"
             sx={btnSx}
           >

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { keyframes } from '@emotion/react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -19,9 +20,9 @@ import { backgroundVideoUrl, getLandingConfig, searchByFace } from '../services/
 import { loadSearchSession, saveSearchSession } from '../utils/userPrefs'
 import type { LandingConfig, SearchMode } from '../types'
 
-const MODE_LABELS: Record<SearchMode, string> = {
-  union: 'Find photos containing at least one person from the image',
-  intersection: 'Find photos containing all people from the image',
+const MODE_LABEL_KEYS: Record<SearchMode, string> = {
+  union: 'homepage.modeUnion',
+  intersection: 'homepage.modeIntersection',
 }
 
 const bounce = keyframes`
@@ -30,6 +31,7 @@ const bounce = keyframes`
 `
 
 export default function HomePage() {
+  const { t } = useTranslation()
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<SearchMode>('union')
   const [loading, setLoading] = useState(false)
@@ -48,7 +50,7 @@ export default function HomePage() {
       .catch(() => setLanding({ title: null, has_video: false }))
   }, [])
 
-  const title = landing?.title || 'Face Finder'
+  const title = landing?.title || t('homepage.title')
 
   const handleSearch = async () => {
     if (!file) return
@@ -59,7 +61,7 @@ export default function HomePage() {
       saveSearchSession({ ...result, mode })
       navigate('/results', { state: { ...result, mode } })
     } catch {
-      setError('Search failed. Please try again.')
+      setError(t('homepage.searchFailed'))
     } finally {
       setLoading(false)
     }
@@ -79,14 +81,14 @@ export default function HomePage() {
           fullWidth
         >
           <ToggleButton value="union" sx={{ flex: 1, textTransform: 'none' }}>
-            Any face
+            {t('homepage.anyFace')}
           </ToggleButton>
           <ToggleButton value="intersection" sx={{ flex: 1, textTransform: 'none' }}>
-            All faces
+            {t('homepage.allFaces')}
           </ToggleButton>
         </ToggleButtonGroup>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block', textAlign: 'center' }}>
-          {MODE_LABELS[mode]}
+          {t(MODE_LABEL_KEYS[mode])}
         </Typography>
       </Box>
 
@@ -105,7 +107,7 @@ export default function HomePage() {
         onClick={handleSearch}
         startIcon={loading ? <CircularProgress size={20} color="inherit" /> : undefined}
       >
-        {loading ? 'Searching…' : 'Find My Photos'}
+        {loading ? t('homepage.searching') : t('homepage.findMyPhotos')}
       </Button>
 
       {savedSession && savedSession.matches.length > 0 && (
@@ -118,8 +120,7 @@ export default function HomePage() {
           disabled={loading}
           onClick={() => navigate('/results')}
         >
-          Continue where you left off — {savedSession.matches.length} photo
-          {savedSession.matches.length !== 1 ? 's' : ''} from your last search
+          {t('homepage.continueSession', { count: savedSession.matches.length })}
         </Button>
       )}
 
@@ -131,7 +132,7 @@ export default function HomePage() {
           onClick={() => navigate('/admin')}
           sx={{ color: 'text.disabled', '&:hover': { color: 'text.secondary' } }}
         >
-          Admin panel
+          {t('homepage.adminPanel')}
         </Button>
       </Box>
     </>
@@ -158,7 +159,7 @@ export default function HomePage() {
               {title}
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
-              Upload a photo and find all your event photos instantly.
+              {t('homepage.subtitle')}
             </Typography>
           </Box>
           {controls}
@@ -198,13 +199,13 @@ export default function HomePage() {
           variant="h6"
           sx={{ mt: 1.5, fontWeight: 400, maxWidth: 460, textShadow: '0 1px 12px rgba(0,0,0,0.6)' }}
         >
-          Upload a photo and find all your event photos instantly.
+          {t('homepage.subtitle')}
         </Typography>
 
         <Box
           role="button"
           tabIndex={0}
-          aria-label="Scroll down to find your photos"
+          aria-label={t('homepage.scrollAriaLabel')}
           onClick={scrollToSearch}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') scrollToSearch()
@@ -222,7 +223,7 @@ export default function HomePage() {
           }}
         >
           <Typography variant="caption" sx={{ textShadow: '0 1px 10px rgba(0,0,0,0.7)' }}>
-            Scroll down
+            {t('homepage.scrollDown')}
           </Typography>
           <KeyboardArrowDownIcon />
         </Box>
@@ -254,7 +255,7 @@ export default function HomePage() {
             }}
           >
             <Typography variant="h5" sx={{ fontWeight: 700, textAlign: 'center', mb: 3 }}>
-              Find your photos
+              {t('homepage.findYourPhotos')}
             </Typography>
             {controls}
           </Box>

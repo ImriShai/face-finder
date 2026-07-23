@@ -7,6 +7,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import { useTranslation } from 'react-i18next'
 import { getEvents, saveEvents } from '../services/api'
 import type { EventDef } from '../types'
 
@@ -17,6 +18,7 @@ function toLocalInput(iso: string): string {
 
 /** Admin editor for the event sections used to group search results. */
 export default function EventsEditor() {
+  const { t } = useTranslation()
   const [rows, setRows] = useState<EventDef[]>([])
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -44,9 +46,9 @@ export default function EventsEditor() {
       const cleaned = rows.filter((r) => r.label.trim() && r.starts_at)
       await saveEvents(cleaned)
       setRows(cleaned)
-      setMsg({ ok: true, text: 'Saved.' })
+      setMsg({ ok: true, text: t('eventseditor.saved') })
     } catch {
-      setMsg({ ok: false, text: 'Save failed. Check the admin password.' })
+      setMsg({ ok: false, text: t('eventseditor.saveFailed') })
     } finally {
       setSaving(false)
     }
@@ -55,29 +57,27 @@ export default function EventsEditor() {
   return (
     <Box sx={{ maxWidth: 640 }}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Split the gallery timeline into named sections. Each photo is grouped into the
-        latest event that started at or before it was taken. Leave the list empty to
-        disable grouping.
+        {t('eventseditor.description')}
       </Typography>
 
       {rows.map((row, i) => (
         <Box key={i} sx={{ display: 'flex', gap: 1, mb: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
-            label="Event name"
+            label={t('eventseditor.eventNameLabel')}
             size="small"
             value={row.label}
             onChange={(e) => update(i, { label: e.target.value })}
             sx={{ flex: 1, minWidth: 160 }}
           />
           <TextField
-            label="Starts at"
+            label={t('eventseditor.startsAtLabel')}
             type="datetime-local"
             size="small"
             value={toLocalInput(row.starts_at)}
             onChange={(e) => update(i, { starts_at: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }}
           />
-          <IconButton onClick={() => remove(i)} aria-label="Remove event">
+          <IconButton onClick={() => remove(i)} aria-label={t('eventseditor.removeEvent')}>
             <DeleteIcon />
           </IconButton>
         </Box>
@@ -85,10 +85,10 @@ export default function EventsEditor() {
 
       <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
         <Button startIcon={<AddIcon />} onClick={add}>
-          Add event
+          {t('eventseditor.addEvent')}
         </Button>
         <Button variant="contained" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : 'Save events'}
+          {saving ? t('eventseditor.saving') : t('eventseditor.saveEvents')}
         </Button>
       </Box>
 

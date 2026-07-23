@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -34,6 +35,7 @@ export default function PhotoGallery({
   onToggleFavorite,
   checkpointId = null,
 }: Props) {
+  const { t } = useTranslation()
   const checkpointIndex = checkpointId ? matches.findIndex((m) => m.photo_id === checkpointId) : -1
   const { visible, hasMore, sentinelRef } = useInfiniteScroll(matches, 20, checkpointIndex)
   const [modalIndex, setModalIndex] = useState<number | null>(null)
@@ -99,7 +101,7 @@ export default function PhotoGallery({
             >
               <img
                 src={thumbnailUrl(match.photo_id)}
-                alt={`Photo ${match.photo_id}`}
+                alt={t('photogallery.photoAlt', { id: match.photo_id })}
                 loading="lazy"
                 style={{
                   width: '100%',
@@ -125,7 +127,7 @@ export default function PhotoGallery({
               {isCheckpoint && !selectMode && (
                 <Chip
                   icon={<BookmarkIcon />}
-                  label="Last viewed"
+                  label={t('photogallery.lastViewed')}
                   size="small"
                   color="primary"
                   sx={{ position: 'absolute', top: 8, left: 8 }}

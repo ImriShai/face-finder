@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -58,6 +59,7 @@ const PRELOAD_RADIUS = 3
 // ── Login screen ─────────────────────────────────────────────────────────────
 
 function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,7 +75,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
       onSuccess()
     } catch {
       clearAdminPassword()
-      setError('Incorrect password.')
+      setError(t('adminpage.incorrectPassword'))
     } finally {
       setLoading(false)
     }
@@ -107,12 +109,12 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
           <AdminPanelSettingsIcon color="primary" />
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Admin Panel
+            {t('adminpage.adminPanel')}
           </Typography>
         </Box>
 
         <TextField
-          label="Password"
+          label={t('adminpage.password')}
           type={showPw ? 'text' : 'password'}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -140,7 +142,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
           disabled={!password || loading}
           startIcon={loading ? <CircularProgress size={18} color="inherit" /> : undefined}
         >
-          {loading ? 'Checking…' : 'Sign in'}
+          {loading ? t('adminpage.checking') : t('adminpage.signIn')}
         </Button>
       </Box>
     </Box>
@@ -150,6 +152,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 // ── Admin panel ───────────────────────────────────────────────────────────────
 
 function AdminPanel({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -236,7 +239,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     try {
       await downloadZip(Array.from(selected), quality, 'gallery-selection.zip', setDownloadProgress)
     } catch {
-      setDownloadError('Download failed. Please try again.')
+      setDownloadError(t('adminpage.downloadFailed'))
     } finally {
       setDownloading(false)
       setDownloadProgress(null)
@@ -248,7 +251,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     try {
       await exportPhotosCsv(Array.from(selected))
     } catch {
-      setDownloadError('Export failed. Please try again.')
+      setDownloadError(t('adminpage.exportFailed'))
     }
   }
 
@@ -278,22 +281,22 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         }}
       >
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
-          Back to app
+          {t('adminpage.backToApp')}
         </Button>
         <AdminPanelSettingsIcon color="primary" />
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          Admin Panel
+          {t('adminpage.adminPanel')}
         </Typography>
         <Box sx={{ flex: 1 }} />
         <Button startIcon={<LogoutIcon />} color="inherit" onClick={() => { clearAdminPassword(); onLogout() }}>
-          Sign out
+          {t('adminpage.signOut')}
         </Button>
       </Box>
 
       <Container maxWidth="lg" sx={{ mt: 4 }}>
         {/* Upload */}
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-          Upload Gallery
+          {t('adminpage.uploadGallery')}
         </Typography>
         <Box sx={{ maxWidth: 560 }}>
           <ZipUploader onUploaded={refresh} />
@@ -303,7 +306,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
         {/* Event sections */}
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-          Event Sections
+          {t('adminpage.eventSections')}
         </Typography>
         <EventsEditor />
 
@@ -311,7 +314,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
         {/* Landing branding */}
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-          Landing Page
+          {t('adminpage.landingPage')}
         </Typography>
         <BrandingEditor />
 
@@ -323,11 +326,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             <>
               <Typography variant="h5" sx={{ fontWeight: 700, flex: 1 }}>
                 {selected.size > 0
-                  ? `${selected.size} of ${shownPhotos.length} selected`
-                  : `${total.toLocaleString()} photo${total !== 1 ? 's' : ''}`}
+                  ? t('adminpage.selectedCount', { count: selected.size, total: shownPhotos.length })
+                  : t('adminpage.photoCount', { count: total })}
               </Typography>
               <Button onClick={selectAll} disabled={selected.size === shownPhotos.length}>
-                Select all loaded
+                {t('adminpage.selectAllLoaded')}
               </Button>
               <Button
                 variant="contained"
@@ -347,20 +350,20 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 disabled={selected.size === 0}
                 onClick={handleExportCsv}
               >
-                Export CSV
+                {t('adminpage.exportCsv')}
               </Button>
               <Button onClick={cancelSelectMode} color="inherit">
-                Cancel
+                {t('adminpage.cancel')}
               </Button>
             </>
           ) : (
             <>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Gallery
+                {t('adminpage.gallery')}
               </Typography>
               {total > 0 && (
                 <Typography variant="body2" color="text.secondary">
-                  {total.toLocaleString()} photo{total !== 1 ? 's' : ''}
+                  {t('adminpage.photoCount', { count: total })}
                 </Typography>
               )}
               <Box sx={{ flex: 1 }} />
@@ -372,25 +375,25 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 sx={{ textTransform: 'none', gap: 0.75, px: 1.5 }}
               >
                 <FavoriteIcon fontSize="small" sx={{ color: likedOnly ? '#ff4569' : 'inherit' }} />
-                Liked
+                {t('adminpage.liked')}
               </ToggleButton>
               {likedOnly && favorites.size > 0 && (
                 <Button
                   size="small"
                   color="inherit"
                   onClick={() => {
-                    if (window.confirm(`Remove all ${favorites.size} liked photos?`)) clearFavorites()
+                    if (window.confirm(t('adminpage.clearLikedConfirm', { count: favorites.size }))) clearFavorites()
                   }}
                 >
-                  Clear liked
+                  {t('adminpage.clearLiked')}
                 </Button>
               )}
               {shownPhotos.length > 0 && (
                 <Button startIcon={<ChecklistIcon />} onClick={enterSelectMode}>
-                  Select
+                  {t('adminpage.select')}
                 </Button>
               )}
-              <Tooltip title="Refresh">
+              <Tooltip title={t('adminpage.refresh')}>
                 <IconButton onClick={refresh} disabled={loading}>
                   <RefreshIcon />
                 </IconButton>
@@ -473,7 +476,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             {loading && <CircularProgress size={28} />}
             {!loading && photos.length === 0 && !error && (
               <Typography color="text.secondary">
-                No photos yet. Upload a gallery above.
+                {t('adminpage.noPhotos')}
               </Typography>
             )}
           </Box>
@@ -481,7 +484,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         {likedOnly && shownPhotos.length === 0 && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <Typography color="text.secondary">
-              No liked photos yet — tap the heart on a photo to save it here.
+              {t('adminpage.noLikedPhotos')}
             </Typography>
           </Box>
         )}
@@ -539,7 +542,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                       onToggle={() => toggleFavorite(currentPhoto.id)}
                     />
                   </Box>
-                  <Tooltip title="Download photo">
+                  <Tooltip title={t('adminpage.downloadPhoto')}>
                     <IconButton
                       size="small"
                       sx={{ bgcolor: 'rgba(0,0,0,0.5)', color: '#fff' }}

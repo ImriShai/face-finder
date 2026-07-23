@@ -7,6 +7,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import DeleteIcon from '@mui/icons-material/Delete'
 import UploadFileIcon from '@mui/icons-material/UploadFile'
+import { useTranslation } from 'react-i18next'
 import {
   deleteBackgroundVideo,
   getLandingConfig,
@@ -16,6 +17,7 @@ import {
 
 /** Admin editor for the landing title and optional background video. */
 export default function BrandingEditor() {
+  const { t } = useTranslation()
   const [title, setTitle] = useState('')
   const [hasVideo, setHasVideo] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -36,9 +38,9 @@ export default function BrandingEditor() {
     setMsg(null)
     try {
       await setLandingTitle(title.trim() || null)
-      setMsg({ ok: true, text: 'Title saved.' })
+      setMsg({ ok: true, text: t('brandingeditor.titleSaved') })
     } catch {
-      setMsg({ ok: false, text: 'Save failed. Check the admin password.' })
+      setMsg({ ok: false, text: t('brandingeditor.saveFailed') })
     }
   }
 
@@ -51,9 +53,9 @@ export default function BrandingEditor() {
     try {
       await uploadBackgroundVideo(f, setPct)
       setHasVideo(true)
-      setMsg({ ok: true, text: 'Background video uploaded.' })
+      setMsg({ ok: true, text: t('brandingeditor.videoUploaded') })
     } catch {
-      setMsg({ ok: false, text: 'Upload failed.' })
+      setMsg({ ok: false, text: t('brandingeditor.uploadFailed') })
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -65,30 +67,28 @@ export default function BrandingEditor() {
     try {
       await deleteBackgroundVideo()
       setHasVideo(false)
-      setMsg({ ok: true, text: 'Background video removed.' })
+      setMsg({ ok: true, text: t('brandingeditor.videoRemoved') })
     } catch {
-      setMsg({ ok: false, text: 'Remove failed.' })
+      setMsg({ ok: false, text: t('brandingeditor.removeFailed') })
     }
   }
 
   return (
     <Box sx={{ maxWidth: 640 }}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Optional landing-page branding. A title shows above the search; a background
-        video plays behind it (muted, with a tap-to-unmute control). Leave the video
-        empty for the plain layout. Tip: compress large videos first — guests download it.
+        {t('brandingeditor.description')}
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
         <TextField
-          label="Landing title"
+          label={t('brandingeditor.landingTitleLabel')}
           size="small"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           sx={{ flex: 1, minWidth: 200 }}
         />
         <Button variant="contained" onClick={saveTitle}>
-          Save title
+          {t('brandingeditor.saveTitle')}
         </Button>
       </Box>
 
@@ -106,16 +106,16 @@ export default function BrandingEditor() {
           disabled={uploading}
           onClick={() => fileRef.current?.click()}
         >
-          {hasVideo ? 'Replace video' : 'Upload background video'}
+          {hasVideo ? t('brandingeditor.replaceVideo') : t('brandingeditor.uploadVideo')}
         </Button>
         {hasVideo && (
           <Button color="error" startIcon={<DeleteIcon />} onClick={removeVideo} disabled={uploading}>
-            Remove video
+            {t('brandingeditor.removeVideo')}
           </Button>
         )}
         {hasVideo && !uploading && (
           <Typography variant="body2" color="success.main">
-            A background video is set.
+            {t('brandingeditor.videoSet')}
           </Typography>
         )}
       </Box>
@@ -124,7 +124,7 @@ export default function BrandingEditor() {
         <Box sx={{ mt: 2 }}>
           <LinearProgress variant="determinate" value={pct} />
           <Typography variant="caption" color="text.secondary">
-            Uploading… {pct}%
+            {t('brandingeditor.uploading', { pct })}
           </Typography>
         </Box>
       )}

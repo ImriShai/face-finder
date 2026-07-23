@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -25,6 +26,7 @@ import { eventIndexForPhoto } from '../utils/events'
 import type { EventDef, SearchMode, SearchResponse } from '../types'
 
 export default function ResultsPage() {
+  const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   // Fall back to the saved session so a returning user (or a page refresh)
@@ -114,7 +116,7 @@ export default function ResultsPage() {
     try {
       await downloadZip(Array.from(selected), quality, 'my-photos.zip', setDownloadProgress)
     } catch {
-      setDownloadError('Download failed. Please try again.')
+      setDownloadError(t('resultspage.downloadFailed'))
     } finally {
       setDownloading(false)
       setDownloadProgress(null)
@@ -131,15 +133,15 @@ export default function ResultsPage() {
           {selectMode ? (
             <>
               <Button startIcon={<CloseIcon />} onClick={cancelSelectMode} variant="outlined">
-                Cancel
+                {t('resultspage.cancel')}
               </Button>
               <Typography variant="h5" sx={{ fontWeight: 700, flex: 1 }}>
                 {selected.size > 0
-                  ? `${selected.size} of ${matches.length} selected`
-                  : `${matches.length} photo${matches.length !== 1 ? 's' : ''}`}
+                  ? t('resultspage.selectedCount', { selected: selected.size, total: matches.length })
+                  : t('resultspage.photoCount', { count: matches.length })}
               </Typography>
               <Button onClick={selectAll} disabled={selected.size === matches.length}>
-                Select all
+                {t('resultspage.selectAll')}
               </Button>
               <Button
                 variant="contained"
@@ -158,18 +160,18 @@ export default function ResultsPage() {
           ) : (
             <>
               <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')} variant="outlined">
-                New Search
+                {t('resultspage.newSearch')}
               </Button>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>
                   {matches.length > 0
-                    ? `${matches.length} photo${matches.length !== 1 ? 's' : ''} found`
-                    : 'Results'}
+                    ? t('resultspage.photosFound', { count: matches.length })
+                    : t('resultspage.results')}
                 </Typography>
                 {facesDetected > 1 && (
                   <Typography variant="caption" color="text.secondary">
-                    {facesDetected} faces detected &middot;{' '}
-                    {mode === 'union' ? 'any face' : 'all faces'}
+                    {t('resultspage.facesDetected', { count: facesDetected })} &middot;{' '}
+                    {mode === 'union' ? t('resultspage.anyFace') : t('resultspage.allFaces')}
                   </Typography>
                 )}
               </Box>
@@ -181,11 +183,11 @@ export default function ResultsPage() {
                 sx={{ textTransform: 'none', gap: 0.75, px: 1.5 }}
               >
                 <FavoriteIcon fontSize="small" sx={{ color: likedOnly ? '#ff4569' : 'inherit' }} />
-                Liked
+                {t('resultspage.liked')}
               </ToggleButton>
               {matches.length > 0 && (
                 <Button startIcon={<ChecklistIcon />} onClick={enterSelectMode}>
-                  Select
+                  {t('resultspage.select')}
                 </Button>
               )}
             </>
@@ -195,7 +197,7 @@ export default function ResultsPage() {
         {!selectMode && availableEvents.length >= 2 && (
           <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
             <Chip
-              label="All"
+              label={t('resultspage.all')}
               color={activeEvent === null ? 'primary' : 'default'}
               variant={activeEvent === null ? 'filled' : 'outlined'}
               onClick={() => setActiveEvent(null)}
@@ -227,17 +229,17 @@ export default function ResultsPage() {
               <>
                 <FavoriteIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
                 <Typography variant="h6" color="text.secondary">
-                  No liked photos yet — tap the heart on a photo to save it here.
+                  {t('resultspage.noLikedPhotos')}
                 </Typography>
               </>
             ) : (
               <>
                 <SearchOffIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
                 <Typography variant="h6" color="text.secondary">
-                  No matching photos were found.
+                  {t('resultspage.noMatchingPhotos')}
                 </Typography>
                 <Button variant="contained" onClick={() => navigate('/')}>
-                  Try Another Selfie
+                  {t('resultspage.tryAnotherSelfie')}
                 </Button>
               </>
             )}

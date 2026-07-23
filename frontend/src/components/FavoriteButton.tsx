@@ -1,6 +1,7 @@
 import IconButton from '@mui/material/IconButton'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   active: boolean
@@ -9,10 +10,11 @@ interface Props {
 
 /** Small heart overlay for photo cards and lightboxes. */
 export default function FavoriteButton({ active, onToggle }: Props) {
+  const { t } = useTranslation()
   return (
     <IconButton
       size="small"
-      aria-label={active ? 'Remove from favorites' : 'Add to favorites'}
+      aria-label={active ? t('favoritebutton.removeFromFavorites') : t('favoritebutton.addToFavorites')}
       onClick={(e) => {
         e.stopPropagation()
         onToggle()

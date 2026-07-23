@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useDropzone } from 'react-dropzone'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -18,6 +19,7 @@ interface Props {
 type Status = { kind: 'idle' } | { kind: 'ready'; file: File } | { kind: 'uploading'; pct: number } | { kind: 'done'; queued: number } | { kind: 'error'; message: string }
 
 export default function ZipUploader({ onUploaded }: Props) {
+  const { t } = useTranslation()
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   const onDrop = useCallback((accepted: File[]) => {
@@ -44,7 +46,7 @@ export default function ZipUploader({ onUploaded }: Props) {
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-        'Upload failed.'
+        t('zipuploader.uploadFailed')
       setStatus({ kind: 'error', message: msg })
     }
   }
@@ -76,16 +78,16 @@ export default function ZipUploader({ onUploaded }: Props) {
               {status.file.name}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {formatBytes(status.file.size)} — drop another file to replace
+              {t('zipuploader.dropToReplace', { size: formatBytes(status.file.size) })}
             </Typography>
           </Box>
         ) : (
           <Box>
             <Typography variant="body1" sx={{ fontWeight: 600 }}>
-              {isDragActive ? 'Drop ZIP here' : 'Drag & drop a ZIP file'}
+              {isDragActive ? t('zipuploader.dropZipHere') : t('zipuploader.dragAndDrop')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              or click to browse — max {Math.round(500)} MB via browser
+              {t('zipuploader.clickToBrowse', { max: Math.round(500) })}
             </Typography>
           </Box>
         )}
@@ -96,7 +98,7 @@ export default function ZipUploader({ onUploaded }: Props) {
         <Box>
           <LinearProgress variant="determinate" value={status.pct} sx={{ borderRadius: 1, mb: 0.5 }} />
           <Typography variant="caption" color="text.secondary">
-            Uploading… {status.pct}%
+            {t('zipuploader.uploadingPct', { pct: status.pct })}
           </Typography>
         </Box>
       )}
@@ -104,8 +106,7 @@ export default function ZipUploader({ onUploaded }: Props) {
       {/* Status alerts */}
       {status.kind === 'done' && (
         <Alert severity="success">
-          Accepted — <strong>{status.queued.toLocaleString()}</strong> photos queued for processing.
-          Face detection runs in the background; the gallery will populate over the next few minutes.
+          {t('zipuploader.acceptedPrefix')} <strong>{status.queued.toLocaleString()}</strong> {t('zipuploader.acceptedSuffix')}
         </Alert>
       )}
       {status.kind === 'error' && (
@@ -120,11 +121,11 @@ export default function ZipUploader({ onUploaded }: Props) {
         disabled={status.kind !== 'ready' || uploading}
         onClick={handleUpload}
       >
-        {uploading ? 'Uploading…' : 'Upload Gallery'}
+        {uploading ? t('zipuploader.uploadingButton') : t('zipuploader.uploadGalleryButton')}
       </Button>
 
       <Typography variant="caption" color="text.secondary">
-        For files larger than 500 MB use the CLI ingestion script inside the container:
+        {t('zipuploader.cliHint')}
         <br />
         <code>docker exec face-finder-backend-1 python scripts/ingest_gallery.py /imports/gallery.zip</code>
       </Typography>
