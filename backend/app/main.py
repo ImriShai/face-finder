@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api import admin, auth, events, health, photos, search
+from app.api import admin, auth, events, health, landing, photos, search
 from app.limiter import limiter
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
@@ -26,6 +26,7 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(events.router)
+app.include_router(landing.router)
 app.include_router(search.router)
 app.include_router(photos.router)
 app.include_router(photos.token_router)

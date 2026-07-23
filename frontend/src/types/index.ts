@@ -17,6 +17,11 @@ export interface EventDef {
   starts_at: string
 }
 
+export interface LandingConfig {
+  title: string | null
+  has_video: boolean
+}
+
 export interface Photo {
   id: string
   filename: string

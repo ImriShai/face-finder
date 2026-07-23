@@ -31,6 +31,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import ZipUploader from '../components/ZipUploader'
 import EventsEditor from '../components/EventsEditor'
+import BrandingEditor from '../components/BrandingEditor'
 import { usePhotoFeed } from '../hooks/usePhotoFeed'
 import {
   clearAdminPassword,
@@ -305,6 +306,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           Event Sections
         </Typography>
         <EventsEditor />
+
+        <Divider sx={{ my: 5 }} />
+
+        {/* Landing branding */}
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+          Landing Page
+        </Typography>
+        <BrandingEditor />
 
         <Divider sx={{ my: 5 }} />
 

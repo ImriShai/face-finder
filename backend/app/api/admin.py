@@ -13,8 +13,9 @@ from app.database.session import AsyncSessionLocal, get_db
 from app.face.faiss_index import faiss_index
 from app.models.photo import Photo
 from app.schemas.event import EventDef
+from app.schemas.landing import LandingConfigUpdate
 from app.schemas.photo import PhotoIdsRequest, PhotoListResponse, PhotoResponse
-from app.services import events_service
+from app.services import events_service, landing_service
 from app.services.export_service import build_photos_csv
 from app.storage.storage_service import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -91,6 +92,30 @@ async def set_events(events: list[EventDef]) -> dict:
     """Replace the event sections used to group search results."""
     events_service.write_events(events)
     return {"status": "saved", "count": len(events)}
+
+
+@router.put("/landing-config", dependencies=[Depends(verify_admin)])
+async def update_landing_config(update: LandingConfigUpdate) -> dict:
+    """Set the landing-page title."""
+    landing_service.set_title(update.title)
+    return {"status": "saved"}
+
+
+@router.post("/background-video", dependencies=[Depends(verify_admin)])
+async def upload_background_video(file: UploadFile = File(...)) -> dict:
+    """Upload/replace the landing-page background video."""
+    try:
+        await landing_service.save_video(file)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"status": "saved"}
+
+
+@router.delete("/background-video", dependencies=[Depends(verify_admin)])
+async def remove_background_video() -> dict:
+    """Remove the background video (revert the landing to the plain layout)."""
+    landing_service.delete_video()
+    return {"status": "deleted"}
 
 
 @router.get("/index-status", dependencies=[Depends(verify_admin)])

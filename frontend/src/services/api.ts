@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { EventDef, PhotoListResponse, SearchResponse } from '../types'
+import type { EventDef, LandingConfig, PhotoListResponse, SearchResponse } from '../types'
 
 const client = axios.create({ baseURL: '/api' })
 
@@ -191,4 +191,33 @@ export async function getEvents(): Promise<EventDef[]> {
 
 export async function saveEvents(events: EventDef[]): Promise<void> {
   await adminClient().put('/admin/events', events)
+}
+
+// ── Landing branding (public read, admin write) ─────────────────────────────────
+
+export async function getLandingConfig(): Promise<LandingConfig> {
+  const { data } = await client.get<LandingConfig>('/landing-config')
+  return data
+}
+
+export function backgroundVideoUrl(): string {
+  return '/api/background-video'
+}
+
+export async function setLandingTitle(title: string | null): Promise<void> {
+  await adminClient().put('/admin/landing-config', { title })
+}
+
+export async function uploadBackgroundVideo(file: File, onProgress?: (pct: number) => void): Promise<void> {
+  const form = new FormData()
+  form.append('file', file)
+  await adminClient().post('/admin/background-video', form, {
+    onUploadProgress: (e) => {
+      if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
+    },
+  })
+}
+
+export async function deleteBackgroundVideo(): Promise<void> {
+  await adminClient().delete('/admin/background-video')
 }
