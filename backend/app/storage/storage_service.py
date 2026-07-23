@@ -1,7 +1,9 @@
+import io
 import os
 import re
 import uuid
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 from PIL import Image
@@ -9,6 +11,43 @@ from PIL import Image
 from app.config import settings
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif"}
+
+
+# EXIF: DateTimeOriginal (when the shutter fired) lives in the Exif sub-IFD
+# (0x8769); DateTime (306) in the base IFD is the fallback. Both use the
+# format "YYYY:MM:DD HH:MM:SS".
+_EXIF_SUB_IFD = 0x8769
+_EXIF_DATETIME_ORIGINAL = 36867
+_EXIF_DATETIME = 306
+
+
+def read_capture_time(source) -> datetime | None:
+    """Best-effort capture time from a file path or raw image bytes.
+
+    Returns None when there's no usable EXIF timestamp (PNGs, stripped
+    metadata, or an unparseable value). Only reads the image header, so cheap.
+    """
+    try:
+        opener = io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else source
+        with Image.open(opener) as img:
+            exif = img.getexif()
+            raw_values = []
+            try:
+                sub = exif.get_ifd(_EXIF_SUB_IFD)
+                if sub.get(_EXIF_DATETIME_ORIGINAL):
+                    raw_values.append(sub[_EXIF_DATETIME_ORIGINAL])
+            except Exception:
+                pass
+            if exif.get(_EXIF_DATETIME):
+                raw_values.append(exif[_EXIF_DATETIME])
+    except Exception:
+        return None
+    for raw in raw_values:
+        try:
+            return datetime.strptime(str(raw).strip(), "%Y:%m:%d %H:%M:%S")
+        except (ValueError, TypeError):
+            continue
+    return None
 
 
 def sanitize_filename(raw: str) -> str:

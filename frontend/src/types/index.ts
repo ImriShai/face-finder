@@ -3,6 +3,7 @@ export type SearchMode = 'union' | 'intersection'
 export interface SearchMatch {
   photo_id: string
   confidence: number
+  taken_at?: string | null
 }
 
 export interface SearchResponse {

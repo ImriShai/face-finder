@@ -15,5 +15,7 @@ class Photo(Base):
     original_path: Mapped[str] = mapped_column(String(500))
     thumbnail_path: Mapped[str] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # When the photo was actually taken (from EXIF); NULL if unknown.
+    taken_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     faces: Mapped[list["DetectedFace"]] = relationship(back_populates="photo", cascade="all, delete-orphan")
