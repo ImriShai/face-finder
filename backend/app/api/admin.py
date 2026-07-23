@@ -12,7 +12,9 @@ from app.config import settings
 from app.database.session import AsyncSessionLocal, get_db
 from app.face.faiss_index import faiss_index
 from app.models.photo import Photo
+from app.schemas.event import EventDef
 from app.schemas.photo import PhotoIdsRequest, PhotoListResponse, PhotoResponse
+from app.services import events_service
 from app.services.export_service import build_photos_csv
 from app.storage.storage_service import (
     ALLOWED_IMAGE_EXTENSIONS,
@@ -82,6 +84,13 @@ async def reload_index() -> dict:
         return {"status": "reloaded", "vectors": new_index.ntotal}
 
     return await loop.run_in_executor(None, _reload)
+
+
+@router.put("/events", dependencies=[Depends(verify_admin)])
+async def set_events(events: list[EventDef]) -> dict:
+    """Replace the event sections used to group search results."""
+    events_service.write_events(events)
+    return {"status": "saved", "count": len(events)}
 
 
 @router.get("/index-status", dependencies=[Depends(verify_admin)])

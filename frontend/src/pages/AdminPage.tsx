@@ -30,6 +30,7 @@ import TableViewIcon from '@mui/icons-material/TableView'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import ZipUploader from '../components/ZipUploader'
+import EventsEditor from '../components/EventsEditor'
 import { usePhotoFeed } from '../hooks/usePhotoFeed'
 import {
   clearAdminPassword,
@@ -296,6 +297,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         <Box sx={{ maxWidth: 560 }}>
           <ZipUploader onUploaded={refresh} />
         </Box>
+
+        <Divider sx={{ my: 5 }} />
+
+        {/* Event sections */}
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+          Event Sections
+        </Typography>
+        <EventsEditor />
 
         <Divider sx={{ my: 5 }} />
 

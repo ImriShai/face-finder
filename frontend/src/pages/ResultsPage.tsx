@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Container from '@mui/material/Container'
 import Snackbar from '@mui/material/Snackbar'
@@ -17,10 +18,11 @@ import ToggleButton from '@mui/material/ToggleButton'
 import DownloadQualityMenu from '../components/DownloadQualityMenu'
 import PhotoGallery from '../components/PhotoGallery'
 import { useFavorites } from '../hooks/useFavorites'
-import { downloadZip, type DownloadProgress, type DownloadQuality } from '../services/api'
+import { downloadZip, getEvents, type DownloadProgress, type DownloadQuality } from '../services/api'
 import { formatDownloadLabel } from '../utils/format'
 import { loadLastViewed, loadSearchSession } from '../utils/userPrefs'
-import type { SearchMode, SearchResponse } from '../types'
+import { eventIndexForPhoto } from '../utils/events'
+import type { EventDef, SearchMode, SearchResponse } from '../types'
 
 export default function ResultsPage() {
   const location = useLocation()
@@ -43,12 +45,39 @@ export default function ResultsPage() {
 
   const { favorites, toggleFavorite } = useFavorites()
   const [likedOnly, setLikedOnly] = useState(false)
+
+  // Admin-defined event sections; results can be filtered to one of them.
+  const [events, setEvents] = useState<EventDef[]>([])
+  const [activeEvent, setActiveEvent] = useState<number | null>(null)
+  useEffect(() => {
+    getEvents()
+      .then(setEvents)
+      .catch(() => setEvents([]))
+  }, [])
+
+  // Count this guest's photos per event — only events they have photos in get a button.
+  const eventCounts = useMemo(() => {
+    const counts: Record<number, number> = {}
+    for (const m of allMatches) {
+      const i = eventIndexForPhoto(m.taken_at, events)
+      if (i !== null) counts[i] = (counts[i] ?? 0) + 1
+    }
+    return counts
+  }, [allMatches, events])
+  const availableEvents = useMemo(
+    () => events.map((ev, i) => ({ ...ev, i })).filter((ev) => (eventCounts[ev.i] ?? 0) > 0),
+    [events, eventCounts],
+  )
+
   // Memoized: a fresh array identity every render would reset the gallery's
   // infinite-scroll paging on unrelated re-renders (download progress, selection).
-  const matches = useMemo(
-    () => (likedOnly ? allMatches.filter((m) => favorites.has(m.photo_id)) : allMatches),
-    [likedOnly, allMatches, favorites],
-  )
+  const matches = useMemo(() => {
+    let list = likedOnly ? allMatches.filter((m) => favorites.has(m.photo_id)) : allMatches
+    if (activeEvent !== null) {
+      list = list.filter((m) => eventIndexForPhoto(m.taken_at, events) === activeEvent)
+    }
+    return list
+  }, [likedOnly, allMatches, favorites, activeEvent, events])
 
   // Checkpoint: the photo the user last previewed, captured once on mount so
   // the marker doesn't chase the modal while browsing.
@@ -162,6 +191,26 @@ export default function ResultsPage() {
             </>
           )}
         </Box>
+
+        {!selectMode && availableEvents.length >= 2 && (
+          <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
+            <Chip
+              label="All"
+              color={activeEvent === null ? 'primary' : 'default'}
+              variant={activeEvent === null ? 'filled' : 'outlined'}
+              onClick={() => setActiveEvent(null)}
+            />
+            {availableEvents.map((ev) => (
+              <Chip
+                key={ev.i}
+                label={`${ev.label} (${eventCounts[ev.i]})`}
+                color={activeEvent === ev.i ? 'primary' : 'default'}
+                variant={activeEvent === ev.i ? 'filled' : 'outlined'}
+                onClick={() => setActiveEvent(ev.i)}
+              />
+            ))}
+          </Box>
+        )}
 
         {matches.length === 0 ? (
           <Box

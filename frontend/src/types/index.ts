@@ -11,6 +11,12 @@ export interface SearchResponse {
   faces_detected?: number
 }
 
+export interface EventDef {
+  label: string
+  /** ISO datetime the event starts at. */
+  starts_at: string
+}
+
 export interface Photo {
   id: string
   filename: string

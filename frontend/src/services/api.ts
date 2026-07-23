@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { PhotoListResponse, SearchResponse } from '../types'
+import type { EventDef, PhotoListResponse, SearchResponse } from '../types'
 
 const client = axios.create({ baseURL: '/api' })
 
@@ -180,4 +180,15 @@ export async function listPhotos(page = 1, pageSize = 48): Promise<PhotoListResp
     params: { page, page_size: pageSize },
   })
   return data
+}
+
+// ── Events (public read, admin write) ───────────────────────────────────────────
+
+export async function getEvents(): Promise<EventDef[]> {
+  const { data } = await client.get<EventDef[]>('/events')
+  return data
+}
+
+export async function saveEvents(events: EventDef[]): Promise<void> {
+  await adminClient().put('/admin/events', events)
 }
