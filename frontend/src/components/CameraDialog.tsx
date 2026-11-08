@@ -23,6 +23,8 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [snapshot, setSnapshot] = useState<string | null>(null)
+  // Holds an i18n key (translated at render) so the camera effect doesn't depend
+  // on `t` and won't restart the stream when the language changes.
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -34,7 +36,7 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
     }
 
     if (!navigator?.mediaDevices?.getUserMedia) {
-      setError(t('cameradialog.errorApiUnavailable'))
+      setError('cameradialog.errorApiUnavailable')
       return
     }
 
@@ -47,7 +49,7 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
         if (videoRef.current) videoRef.current.srcObject = stream
       })
       .catch(() => {
-        if (mounted) setError(t('cameradialog.errorAccessDeniedOrNoCamera'))
+        if (mounted) setError('cameradialog.errorAccessDeniedOrNoCamera')
       })
 
     return () => {
@@ -82,7 +84,7 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
         streamRef.current = stream
         if (videoRef.current) videoRef.current.srcObject = stream
       })
-      .catch(() => setError(t('cameradialog.errorAccessDenied')))
+      .catch(() => setError('cameradialog.errorAccessDenied'))
   }
 
   function handleConfirm() {
@@ -104,7 +106,7 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
         {error ? (
           <Box sx={{ p: 4, textAlign: 'center', bgcolor: 'background.paper' }}>
             <Typography color="error" variant="body2">
-              {error}
+              {t(error)}
             </Typography>
           </Box>
         ) : snapshot ? (

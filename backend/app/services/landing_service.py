@@ -1,8 +1,8 @@
 """Admin-configurable landing branding: an optional title and background video,
 persisted under the storage volume so they survive restarts."""
+import asyncio
 import json
 import os
-import shutil
 
 from fastapi import UploadFile
 
@@ -69,17 +69,49 @@ def _delete_video_files() -> None:
             os.remove(candidate)
 
 
+_COPY_CHUNK = 1024 * 1024  # 1 MB
+
+
+def _write_video(src, dest: str) -> None:
+    """Copy the upload to a temp file, enforcing the size cap, then swap it in.
+
+    The previous video is only removed once the new one is fully written, so a
+    failed or oversized upload leaves the current background untouched and never
+    leaves a truncated file behind.
+    """
+    tmp = f"{dest}.tmp"
+    written = 0
+    try:
+        with open(tmp, "wb") as out:
+            while chunk := src.read(_COPY_CHUNK):
+                written += len(chunk)
+                if written > settings.MAX_VIDEO_UPLOAD_SIZE:
+                    raise ValueError(
+                        f"Video exceeds the {settings.MAX_VIDEO_UPLOAD_SIZE // (1024 * 1024)} MB limit"
+                    )
+                out.write(chunk)
+        if written == 0:
+            raise ValueError("Uploaded video is empty")
+        for ext in _VIDEO_TYPES:  # only one background video at a time
+            other = f"{_VIDEO_STEM}{ext}"
+            if other != dest and os.path.exists(other):
+                os.remove(other)
+        os.replace(tmp, dest)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
 async def save_video(upload: UploadFile) -> None:
     ext = os.path.splitext(upload.filename or "")[1].lower()
     if ext not in _VIDEO_TYPES:
         raise ValueError(f"Unsupported video type '{ext}'. Allowed: {', '.join(_VIDEO_TYPES)}")
     os.makedirs(_DIR, exist_ok=True)
-    _delete_video_files()  # only one background video at a time
     dest = f"{_VIDEO_STEM}{ext}"
-    # Stream from the upload's spooled temp file — never load the whole video
-    # into memory.
-    with open(dest, "wb") as out:
-        shutil.copyfileobj(upload.file, out)
+    # Stream from the upload's spooled temp file in a worker thread — never load
+    # the whole video into memory or block the event loop on disk I/O.
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _write_video, upload.file, dest)
 
 
 def delete_video() -> None:

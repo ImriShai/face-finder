@@ -5,7 +5,7 @@ Upload a selfie, get back every photo from an event gallery you appear in.
 An admin uploads a ZIP of event photos → the backend detects every face, generates
 embeddings, and indexes them in FAISS. A guest then uploads a selfie → the backend
 embeds it and returns every photo whose faces match above a configurable similarity
-threshold, sorted by confidence. Guests can favorite photos, download selections as a
+threshold, in the order they were taken (EXIF capture time). Guests can favorite photos, download selections as a
 ZIP in web or original quality, and come back later without retaking a selfie.
 
 ## Contents
@@ -112,6 +112,7 @@ the same name — every `Settings` field is env-overridable):
 | `SEARCH_RATE_LIMIT`       | `10/minute`   | Rate limit on `/search`, per client IP                  |
 | `INSIGHTFACE_MODEL`       | `buffalo_l`   | InsightFace model pack                                  |
 | `THUMBNAIL_SIZE`          | `(400, 400)`  | Thumbnail max dimensions                                |
+| `MAX_VIDEO_UPLOAD_SIZE`   | 200 MB        | Max size of the landing-page background video           |
 
 ---
 
@@ -123,8 +124,10 @@ the same name — every `Settings` field is env-overridable):
    task, so the upload request returns immediately with a queued count.
 3. Watch the gallery grid fill in as ingestion proceeds (refresh or re-open Admin).
 4. On the homepage, a guest uploads a selfie (drag-and-drop) and clicks **Find My Photos**.
-   If multiple faces are in the selfie, the largest one is used. Results are sorted by
-   confidence, with an empty state if nothing matches.
+   If multiple faces are in the selfie, the largest one is used. Results are ordered by
+   when each photo was taken (EXIF `DateTimeOriginal`, falling back to `DateTime`);
+   photos with no usable date come last, ordered by filename. Each result still shows its
+   match confidence. There's an empty state if nothing matches.
 5. From the results page (or Admin gallery), select photos and download them individually
    or as a ZIP; a progress bar shows percentage and estimated size while it streams.
    The ZIP download offers two qualities: **Web size** (the ~2000px WebP previews, ~50×
@@ -145,6 +148,28 @@ All three are stored per browser in `localStorage` (the app has no user accounts
 - **Last-viewed checkpoint** — the last photo previewed in the modal is remembered; on
   return, the gallery reveals up to it, scrolls to it, and marks it with a *Last viewed*
   chip.
+
+### Event sections
+
+In Admin, **Event Sections** lets you name the parts of the day by start time (e.g.
+*Ceremony* at 18:00, *Reception* at 20:30). A photo belongs to the latest section that
+started at or before its capture time. On the results page, guests get a filter button for
+each section they appear in. Times are wall-clock with no timezone, compared directly with
+the cameras' EXIF timestamps, so enter them in the cameras' local time. Photos without a
+capture time aren't assigned to any section. Stored in `/storage/events_config.json`.
+
+### Landing page branding
+
+In Admin, **Landing Page** sets an optional landing-page title and a background video (`.mp4`,
+`.webm`, `.mov`, or `.ogg`, up to `MAX_VIDEO_UPLOAD_SIZE`). Uploading a new video replaces
+the old one only after the upload completes, so a failed upload keeps the current one.
+Both are public (served without the viewer password) since they're shown on the landing
+page. Stored under `/storage/branding/`.
+
+### Language
+
+The UI is available in English and Hebrew (right-to-left layout), switchable from the
+language toggle; the choice is remembered per browser.
 
 ### Admin CSV export
 
@@ -196,6 +221,17 @@ Useful flags:
 On completion the script POSTs to `/admin/reload-index` so the running backend picks up the
 new FAISS vectors without a restart (it prints a manual `curl` fallback if that call fails).
 
+### Backfilling capture times for older galleries
+
+Photos ingested before the `taken_at` column existed have no capture time, so they sort by
+filename and don't fall into event sections. Fill them in from the stored originals' EXIF
+data (no re-ingest, no face processing):
+
+```bash
+docker compose exec backend python scripts/backfill_taken_at.py        # only rows still NULL
+docker compose exec backend python scripts/backfill_taken_at.py --all  # re-read every photo
+```
+
 ### Re-deriving thumbnails/previews or reloading the index manually
 
 ```bash
@@ -238,6 +274,20 @@ npm install
 npm run dev      # http://localhost:5173, proxies /api → http://localhost:8000
 ```
 
+### GPU acceleration (optional)
+
+Face detection and embedding during ingestion can run on an NVIDIA GPU. The default image
+stays CPU-only; `backend/Dockerfile.gpu` builds a CUDA 11.8 + `onnxruntime-gpu` variant.
+It needs an NVIDIA driver (>= 520) and the NVIDIA Container Toolkit on the host:
+
+```bash
+docker build -f backend/Dockerfile.gpu -t face-finder-backend-gpu backend
+# then run it with --gpus all (or add a GPU device reservation to the compose service)
+```
+
+At startup the backend logs `InsightFace providers=...`. It uses CUDA when available and
+falls back to CPU otherwise, so the same code runs on both images.
+
 ### Common backend commands
 
 ```bash
@@ -264,7 +314,8 @@ npm run lint           # eslint
 
 Two tables, managed by Alembic (`backend/alembic/versions/`):
 
-- **`photos`**: `id` (UUID), `filename`, `original_path`, `thumbnail_path`, `created_at`.
+- **`photos`**: `id` (UUID), `filename`, `original_path`, `thumbnail_path`, `created_at`,
+  `taken_at` (EXIF capture time, nullable).
 - **`detected_faces`**: `id`, `photo_id` (FK → photos), `face_index`, `faiss_vector_id`.
   One photo can have many faces.
 
@@ -296,7 +347,10 @@ strip the `/api` prefix). Interactive docs: `GET /docs`.
 | `POST /auth/login`                     | none            | Viewer login, sets `viewer_token` cookie |
 | `POST /auth/logout`                    | none            | Clears the viewer cookie |
 | `GET /auth/verify`                     | viewer cookie   | Checks the current session is still valid |
-| `POST /search`                         | viewer          | Upload a selfie, get back matching photos (rate-limited) |
+| `POST /search`                         | viewer          | Upload a selfie, get back matching photos ordered by capture time (rate-limited) |
+| `GET /events`                          | none            | Admin-defined event sections (`label`, `starts_at`) |
+| `GET /landing-config`                  | none            | Landing title and whether a background video is set |
+| `GET /background-video`                | none            | Streams the landing background video (range requests supported) |
 | `GET /photos/{id}`                     | viewer          | Original photo file |
 | `GET /photos/{id}/preview`             | viewer          | ~2000px WebP preview (generated on first request) |
 | `GET /thumbnails/{id}`                 | none            | 400×400 thumbnail |
@@ -309,6 +363,10 @@ strip the `/api` prefix). Interactive docs: `GET /docs`.
 | `POST /admin/regen-previews`           | admin           | Generate missing previews (background) |
 | `GET /admin/photos`                    | admin           | Paginated photo list for the admin gallery (stable `created_at, id` ordering) |
 | `POST /admin/photos/export.csv`        | admin           | CSV (`id`, `filename`, `created_at`) for the given photo IDs |
+| `PUT /admin/events`                    | admin           | Replace the event sections (JSON list of `{label, starts_at}`) |
+| `PUT /admin/landing-config`            | admin           | Set the landing title (`{"title": ...}`; empty clears it) |
+| `POST /admin/background-video`         | admin           | Upload/replace the background video (multipart, size-capped) |
+| `DELETE /admin/background-video`       | admin           | Remove the background video |
 
 "admin" auth = `X-Admin-Password` header. "viewer" auth = `viewer_token` cookie (set via
 `/auth/login`) or `X-Viewer-Password` header; both are no-ops if `VIEWER_PASSWORD` is unset.
@@ -318,7 +376,11 @@ Search response shape:
 ```json
 {
   "matches": [
-    { "photo_id": "d290f1ee-6c54-4b01-90e6-d701748f0851", "confidence": 0.93 }
+    {
+      "photo_id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+      "confidence": 0.93,
+      "taken_at": "2025-06-01T18:30:00"
+    }
   ],
   "faces_detected": 1
 }
@@ -349,6 +411,8 @@ Inside the backend container (the `storage_data` volume in Compose):
   previews/      # <photo_id>.webp, ~2000px — generated at ingestion (or on demand),
                  # served by the preview endpoint and reused for web-size ZIP downloads
   faiss.index    # binary FAISS index file
+  events_config.json  # admin-defined event sections
+  branding/      # landing.json (title) + background.<ext> (video)
 ```
 
 Previews are written atomically (temp file + rename), so concurrent readers never see a
@@ -376,7 +440,7 @@ backend/
     workers/       # background gallery ingestion (gallery_worker)
     storage/       # file storage helpers (zip extraction, thumbnails, previews)
   alembic/         # migrations
-  scripts/         # ingest_gallery.py — out-of-band large-ZIP ingestion
+  scripts/         # ingest_gallery.py (large-ZIP ingestion), backfill_taken_at.py
   tests/
 
 frontend/

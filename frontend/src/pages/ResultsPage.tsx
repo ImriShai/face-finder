@@ -34,7 +34,7 @@ export default function ResultsPage() {
   const [result] = useState(
     () => (location.state as (SearchResponse & { mode?: SearchMode }) | null) ?? loadSearchSession(),
   )
-  const allMatches = result?.matches ?? []
+  const allMatches = useMemo(() => result?.matches ?? [], [result])
   const facesDetected = result?.faces_detected ?? 1
   const mode = result?.mode ?? 'union'
 
