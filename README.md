@@ -112,7 +112,7 @@ the same name — every `Settings` field is env-overridable):
 | `SEARCH_RATE_LIMIT`       | `10/minute`   | Rate limit on `/search`, per client IP                  |
 | `INSIGHTFACE_MODEL`       | `buffalo_l`   | InsightFace model pack                                  |
 | `THUMBNAIL_SIZE`          | `(400, 400)`  | Thumbnail max dimensions                                |
-| `MAX_VIDEO_UPLOAD_SIZE`   | 200 MB        | Max size of the landing-page background video           |
+| `MAX_VIDEO_UPLOAD_SIZE`   | 500 MB        | Max size of the landing-page background video           |
 
 ---
 
