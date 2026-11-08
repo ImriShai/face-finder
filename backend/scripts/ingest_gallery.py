@@ -52,7 +52,7 @@ from app.face.face_service import face_service
 from app.face.faiss_index import faiss_index
 from app.models.detected_face import DetectedFace
 from app.models.photo import Photo
-from app.storage.storage_service import ALLOWED_IMAGE_EXTENSIONS, PREVIEW_EXT, PREVIEW_SIZE, THUMBNAIL_EXT, THUMBNAIL_SIZE
+from app.storage.storage_service import ALLOWED_IMAGE_EXTENSIONS, PREVIEW_EXT, PREVIEW_SIZE, THUMBNAIL_EXT, THUMBNAIL_SIZE, read_capture_time
 
 # Commit to the DB every N successfully processed photos.
 # Larger batches = fewer round-trips; smaller = less re-work if interrupted.
@@ -204,6 +204,7 @@ async def ingest(zip_path: str, *, dry_run: bool = False, skip_existing: bool = 
 
                     # ── 3. Write original to gallery dir ─────────────────────
                     dest_path = _safe_dest(settings.GALLERY_DIR, safe_name)
+                    taken_at = read_capture_time(image_bytes)
                     await loop.run_in_executor(
                         None, lambda p=dest_path, b=image_bytes: Path(p).write_bytes(b)
                     )
@@ -212,7 +213,7 @@ async def ingest(zip_path: str, *, dry_run: bool = False, skip_existing: bool = 
                     # ── 4. Build Photo row — generate UUID explicitly so photo.id is
                     #       available now (SQLAlchemy's default= fires at INSERT time, not here)
                     photo_id = uuid.uuid4()
-                    photo = Photo(id=photo_id, filename=safe_name, original_path=dest_path, thumbnail_path="")
+                    photo = Photo(id=photo_id, filename=safe_name, original_path=dest_path, thumbnail_path="", taken_at=taken_at)
 
                     # ── 5. Thumbnail and preview from already-decoded img (no disk re-read)
                     thumb_path = os.path.join(settings.THUMBNAILS_DIR, f"{photo_id}{THUMBNAIL_EXT}")

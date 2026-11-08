@@ -1,0 +1,34 @@
+# Optional GPU build of the backend, for much faster ingestion on an NVIDIA GPU.
+# This is entirely opt-in — the default ./Dockerfile stays CPU-only, and the app
+# falls back to CPU automatically when no GPU is present (see FaceService).
+#
+# Build:   docker build -f backend/Dockerfile.gpu -t face-finder-backend-gpu backend
+# Run:     add `--gpus all` to your docker run / compose service.
+# Requires on the host: an NVIDIA driver (>=520) and the NVIDIA Container Toolkit.
+# CUDA 11.8 + cuDNN 8 matches onnxruntime-gpu==1.17.1 (its default PyPI wheel).
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip \
+    libglib2.0-0 \
+    libgl1 \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-gpu.txt .
+RUN pip3 install --no-cache-dir -r requirements-gpu.txt
+# insightface can pull in the CPU onnxruntime, which shares files with
+# onnxruntime-gpu and corrupts it; force a clean, GPU-only install.
+RUN pip3 uninstall -y onnxruntime onnxruntime-gpu \
+    && pip3 install --no-cache-dir onnxruntime-gpu==1.17.1
+
+COPY . .
+
+RUN mkdir -p /storage/gallery /storage/thumbnails /storage/previews
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useDropzone } from 'react-dropzone'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function UploadDropzone({ onFileSelected, disabled }: Props) {
+  const { t } = useTranslation()
   const [preview, setPreview] = useState<string | null>(null)
   const [showCamera, setShowCamera] = useState(false)
 
@@ -63,13 +65,13 @@ export default function UploadDropzone({ onFileSelected, disabled }: Props) {
             <Box
               component="img"
               src={preview}
-              alt="Selfie preview"
+              alt={t('uploaddropzone.selfiePreviewAlt')}
               sx={{ width: 180, height: 180, objectFit: 'cover', borderRadius: '50%', boxShadow: 3 }}
             />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CheckCircleOutlineIcon color="success" fontSize="small" />
               <Typography variant="body2" color="text.secondary">
-                Ready to search
+                {t('uploaddropzone.readyToSearch')}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
@@ -80,7 +82,7 @@ export default function UploadDropzone({ onFileSelected, disabled }: Props) {
                 onClick={() => setShowCamera(true)}
                 disabled={disabled}
               >
-                Retake
+                {t('uploaddropzone.retake')}
               </Button>
               <Button
                 size="small"
@@ -89,7 +91,7 @@ export default function UploadDropzone({ onFileSelected, disabled }: Props) {
                 onClick={openPicker}
                 disabled={disabled}
               >
-                Change
+                {t('uploaddropzone.change')}
               </Button>
             </Box>
           </Box>
@@ -97,13 +99,13 @@ export default function UploadDropzone({ onFileSelected, disabled }: Props) {
           /* ── Empty state ── */
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              {isDragActive ? 'Drop your selfie here' : 'Upload your selfie'}
+              {isDragActive ? t('uploaddropzone.dropSelfieHere') : t('uploaddropzone.uploadSelfie')}
             </Typography>
 
             {!isDragActive && (
               <>
                 <Typography variant="body2" color="text.secondary">
-                  Take a new photo or pick one from your gallery
+                  {t('uploaddropzone.takeOrPick')}
                 </Typography>
 
                 <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
@@ -114,7 +116,7 @@ export default function UploadDropzone({ onFileSelected, disabled }: Props) {
                     onClick={() => setShowCamera(true)}
                     disabled={disabled}
                   >
-                    Camera
+                    {t('uploaddropzone.camera')}
                   </Button>
                   <Button
                     variant="outlined"
@@ -123,12 +125,12 @@ export default function UploadDropzone({ onFileSelected, disabled }: Props) {
                     onClick={openPicker}
                     disabled={disabled}
                   >
-                    Gallery
+                    {t('uploaddropzone.gallery')}
                   </Button>
                 </Box>
 
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                  or drag &amp; drop an image anywhere above
+                  {t('uploaddropzone.orDragDrop')}
                 </Typography>
               </>
             )}

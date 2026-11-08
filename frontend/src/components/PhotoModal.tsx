@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import Modal from '@mui/material/Modal'
@@ -25,6 +26,7 @@ interface Props {
 const PRELOAD_RADIUS = 3
 
 export default function PhotoModal({ matches, index, onClose, onNavigate, favorites, onToggleFavorite }: Props) {
+  const { t } = useTranslation()
   const open = index !== null
   const match = index !== null ? matches[index] : null
   const [fullLoaded, setFullLoaded] = useState(false)
@@ -105,7 +107,7 @@ export default function PhotoModal({ matches, index, onClose, onNavigate, favori
               />
               <img
                 src={previewUrl(match.photo_id)}
-                alt="Photo"
+                alt={t('photomodal.photoAlt')}
                 onLoad={() => setFullLoaded(true)}
                 style={{
                   gridArea: '1/1',
@@ -128,7 +130,7 @@ export default function PhotoModal({ matches, index, onClose, onNavigate, favori
                   />
                 </Box>
               )}
-              <Tooltip title="Download original">
+              <Tooltip title={t('photomodal.downloadOriginal')}>
                 <IconButton
                   size="small"
                   sx={{ bgcolor: 'rgba(0,0,0,0.5)', color: '#fff' }}

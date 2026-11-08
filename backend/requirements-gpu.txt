@@ -1,0 +1,19 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+alembic>=1.13.0
+pydantic-settings>=2.5.0
+insightface>=0.7.3
+faiss-cpu>=1.7.4
+Pillow>=10.0.0
+python-multipart>=0.0.9
+slowapi>=0.1.9
+aiofiles>=23.0.0
+# The two pins below are intentional and differ from requirements.txt:
+# onnxruntime-gpu 1.17.1 is the last default PyPI wheel built for CUDA 11.8 /
+# cuDNN 8 (the Dockerfile.gpu base image), and it is compiled against NumPy 1.x.
+# Bump them together with the CUDA base image.
+numpy>=1.24,<2.0
+onnxruntime-gpu==1.17.1
+opencv-python-headless>=4.8.0

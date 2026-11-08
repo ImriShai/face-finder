@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     PREVIEWS_DIR: str = "/storage/previews"
     FAISS_INDEX_PATH: str = "/storage/faiss.index"
     MAX_UPLOAD_SIZE: int = 500 * 1024 * 1024  # 500 MB
+    MAX_VIDEO_UPLOAD_SIZE: int = 500 * 1024 * 1024  # 500 MB (landing background video)
     THUMBNAIL_SIZE: tuple[int, int] = (400, 400)
     MATCH_THRESHOLD: float = 0.45
     SEARCH_RATE_LIMIT: str = "10/minute"

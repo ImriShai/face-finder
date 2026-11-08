@@ -6,6 +6,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera'
+import { useTranslation } from 'react-i18next'
 import {
   authConfig,
   verifyViewerSession,
@@ -13,6 +14,7 @@ import {
 } from '../services/api'
 
 export default function ViewerGate({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   // null = still checking, false = gate needed, true = access granted
   const [status, setStatus] = useState<'checking' | 'gate' | 'open'>('checking')
   const [password, setPassword] = useState('')
@@ -40,7 +42,7 @@ export default function ViewerGate({ children }: { children: React.ReactNode }) 
       await viewerLogin(password)
       setStatus('open')
     } catch {
-      setError('Incorrect password.')
+      setError(t('viewergate.incorrectPassword'))
     } finally {
       setLoading(false)
     }
@@ -83,14 +85,14 @@ export default function ViewerGate({ children }: { children: React.ReactNode }) 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
             <PhotoCameraIcon color="primary" />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Event Photos
+              {t('viewergate.eventPhotos')}
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary">
-            Enter the password to access the photo gallery.
+            {t('viewergate.enterPasswordPrompt')}
           </Typography>
           <TextField
-            label="Password"
+            label={t('viewergate.passwordLabel')}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -105,7 +107,7 @@ export default function ViewerGate({ children }: { children: React.ReactNode }) 
             disabled={!password || loading}
             startIcon={loading ? <CircularProgress size={18} color="inherit" /> : undefined}
           >
-            {loading ? 'Checking…' : 'Enter'}
+            {loading ? t('viewergate.checking') : t('viewergate.enter')}
           </Button>
         </Box>
       </Box>

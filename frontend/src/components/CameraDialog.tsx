@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
@@ -17,10 +18,13 @@ interface Props {
 }
 
 export default function CameraDialog({ open, onCapture, onClose }: Props) {
+  const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [snapshot, setSnapshot] = useState<string | null>(null)
+  // Holds an i18n key (translated at render) so the camera effect doesn't depend
+  // on `t` and won't restart the stream when the language changes.
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -32,7 +36,7 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
     }
 
     if (!navigator?.mediaDevices?.getUserMedia) {
-      setError('Camera API is not available in this browser or context (requires HTTPS).')
+      setError('cameradialog.errorApiUnavailable')
       return
     }
 
@@ -45,7 +49,7 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
         if (videoRef.current) videoRef.current.srcObject = stream
       })
       .catch(() => {
-        if (mounted) setError('Camera access was denied or no camera is available.')
+        if (mounted) setError('cameradialog.errorAccessDeniedOrNoCamera')
       })
 
     return () => {
@@ -80,7 +84,7 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
         streamRef.current = stream
         if (videoRef.current) videoRef.current.srcObject = stream
       })
-      .catch(() => setError('Camera access was denied.'))
+      .catch(() => setError('cameradialog.errorAccessDenied'))
   }
 
   function handleConfirm() {
@@ -96,20 +100,20 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Take a selfie</DialogTitle>
+      <DialogTitle>{t('cameradialog.title')}</DialogTitle>
 
       <DialogContent sx={{ p: 0, bgcolor: '#000', position: 'relative', lineHeight: 0 }}>
         {error ? (
           <Box sx={{ p: 4, textAlign: 'center', bgcolor: 'background.paper' }}>
             <Typography color="error" variant="body2">
-              {error}
+              {t(error)}
             </Typography>
           </Box>
         ) : snapshot ? (
           <Box
             component="img"
             src={snapshot}
-            alt="Captured selfie"
+            alt={t('cameradialog.capturedSelfieAlt')}
             sx={{ width: '100%', display: 'block' }}
           />
         ) : (
@@ -127,21 +131,21 @@ export default function CameraDialog({ open, onCapture, onClose }: Props) {
 
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button onClick={onClose} color="inherit">
-          Cancel
+          {t('cameradialog.cancel')}
         </Button>
         <Box sx={{ flex: 1 }} />
         {!error && !snapshot && (
           <Button variant="contained" startIcon={<CameraAltIcon />} onClick={handleCapture}>
-            Capture
+            {t('cameradialog.capture')}
           </Button>
         )}
         {snapshot && (
           <>
             <Button startIcon={<ReplayIcon />} onClick={handleRetake}>
-              Retake
+              {t('cameradialog.retake')}
             </Button>
             <Button variant="contained" startIcon={<CheckIcon />} onClick={handleConfirm}>
-              Use this photo
+              {t('cameradialog.useThisPhoto')}
             </Button>
           </>
         )}

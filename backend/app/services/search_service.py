@@ -1,6 +1,7 @@
 import io
 import logging
 import uuid
+from datetime import datetime
 
 import cv2
 import numpy as np
@@ -12,6 +13,7 @@ from app.config import settings
 from app.face.face_service import face_service
 from app.face.faiss_index import faiss_index
 from app.models.detected_face import DetectedFace
+from app.models.photo import Photo
 from app.schemas.search import SearchMatch, SearchResponse
 
 logger = logging.getLogger(__name__)
@@ -84,8 +86,29 @@ async def search_by_image(image_data: bytes, mode: str, db: AsyncSession) -> Sea
                 if score > combined.get(pid, -1.0):
                     combined[pid] = score
 
+    # Order results by capture time (EXIF), falling back to filename for photos
+    # with no usable date — reconstructs the event's timeline rather than
+    # ordering by match confidence.
+    if not combined:
+        return SearchResponse(matches=[], faces_detected=faces_detected)
+
+    meta_rows = (
+        await db.execute(
+            select(Photo.id, Photo.taken_at, Photo.filename).where(Photo.id.in_(combined.keys()))
+        )
+    ).all()
+    meta = {pid: (taken_at, filename) for pid, taken_at, filename in meta_rows}
+
+    def _order_key(pid: uuid.UUID):
+        taken_at, filename = meta.get(pid, (None, ""))
+        return (taken_at is None, taken_at or datetime.min, filename or "")
+
     matches = [
-        SearchMatch(photo_id=pid, confidence=round(score, 4))
-        for pid, score in sorted(combined.items(), key=lambda x: -x[1])
+        SearchMatch(
+            photo_id=pid,
+            confidence=round(combined[pid], 4),
+            taken_at=meta.get(pid, (None, ""))[0],
+        )
+        for pid in sorted(combined.keys(), key=_order_key)
     ]
     return SearchResponse(matches=matches, faces_detected=faces_detected)
