@@ -39,16 +39,33 @@ class FaissIndex:
             index.add(vectors)
             return list(range(start_id, start_id + len(vectors)))
 
+    @property
+    def ntotal(self) -> int:
+        with self._lock:
+            return self._load_or_create().ntotal
+
     def save(self) -> None:
-        """Persist the current index to disk."""
+        """Persist the current index to disk atomically.
+
+        Written to a temp file and renamed into place, so a crash mid-write can
+        never leave a truncated index behind — readers see the old file or the
+        new one, nothing in between.
+        """
         import faiss
         from app.config import settings
 
         with self._lock:
             if self._index is None:
                 return
-            os.makedirs(os.path.dirname(settings.FAISS_INDEX_PATH), exist_ok=True)
-            faiss.write_index(self._index, settings.FAISS_INDEX_PATH)
+            path = settings.FAISS_INDEX_PATH
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp = f"{path}.tmp"
+            try:
+                faiss.write_index(self._index, tmp)
+                os.replace(tmp, path)
+            finally:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
             logger.info("FAISS index saved (%d vectors)", self._index.ntotal)
 
     def search(self, query: np.ndarray, k: int = 500) -> list[tuple[int, float]]:

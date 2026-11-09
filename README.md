@@ -192,8 +192,10 @@ against ZIP Slip (path traversal) during extraction.
 ### 2. `scripts/ingest_gallery.py` (large ZIPs, bypasses the HTTP upload limit)
 
 For galleries too large to comfortably upload over HTTP, run the ingestion script directly
-inside the backend container. It streams the ZIP's central directory, reads one photo at a
-time, and commits to the DB in batches — memory stays flat regardless of ZIP size.
+inside the backend container. A pool of worker threads prepares photos in parallel (reads
+them from the ZIP, decodes them, and writes the original, preview and thumbnail), while the
+main loop runs face detection. Only a bounded number of decoded photos are held in memory,
+so memory use doesn't grow with ZIP size.
 
 ```bash
 # Option A — bind-mount the directory holding the zip (zero copy, recommended)
@@ -215,8 +217,31 @@ docker exec face-finder-backend-1 python scripts/ingest_gallery.py /tmp/gallery.
 Useful flags:
 
 - `--dry-run` — count images in the ZIP and exit, no writes.
-- `--skip-existing` — skip photos whose filename is already in the DB (safe to re-run after
-  a partial failure/interruption).
+- `--skip-existing` — skip photos whose filename is already in the DB. Use it to continue an
+  interrupted run.
+- `--workers N` — threads preparing photos in parallel (default: CPU count, capped at 8).
+- `--checkpoint N` — save the search index and commit to the DB every N photos (default 100).
+
+**Interruptions are safe.** At each checkpoint the FAISS index is saved to disk first and the
+matching DB rows are committed after it, so photos in the DB always have their face vectors
+on disk. After a crash, at most the last checkpoint's worth of photos is redone. `docker stop`
+or Ctrl+C finishes the photos in flight, checkpoints, and exits cleanly. That takes a few
+seconds, so start ingest containers with `--stop-timeout 60`; otherwise Docker may kill the
+process before it checkpoints (still safe, just more re-work). Either way, re-run with
+`--skip-existing` to continue.
+
+**Use the GPU image for big galleries.** On an RTX 2060 Super, 300 typical ~10 MB wedding
+photos took about 70 s (~4.2 photos/s) with `face-finder-backend-gpu` (see
+[GPU acceleration](#gpu-acceleration-optional)), versus about 5 min (~0.95 photos/s) on the
+CPU image. Add `--gpus all` and use `python3` instead of `python`:
+
+```bash
+docker run --rm --gpus all --stop-timeout 60 --network face-finder_default --env-file .env \
+  -e BACKEND_URL=http://backend:8000 \
+  -v /path/to/dir:/mnt/imports:ro -v face-finder_storage_data:/storage \
+  -v face-finder_insightface_models:/root/.insightface \
+  face-finder-backend-gpu python3 scripts/ingest_gallery.py /mnt/imports/gallery.zip
+```
 
 On completion the script POSTs to `/admin/reload-index` so the running backend picks up the
 new FAISS vectors without a restart (it prints a manual `curl` fallback if that call fails).

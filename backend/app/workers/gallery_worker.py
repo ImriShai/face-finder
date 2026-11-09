@@ -38,6 +38,10 @@ async def process_gallery(zip_path: str, extracted_paths: list[str]) -> None:
     face_batch: list[DetectedFace] = []
 
     async def _flush(db) -> None:
+        # Persist the vectors BEFORE committing the rows that point at them, so a
+        # crash between the two can only leave unreferenced vectors (harmless —
+        # search ignores them), never DB faces whose vectors were lost.
+        await loop.run_in_executor(None, faiss_index.save)
         if photo_batch:
             db.add_all(photo_batch)
             photo_batch.clear()
